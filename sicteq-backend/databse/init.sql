@@ -1,0 +1,78 @@
+CREATE TABLE IF NOT EXISTS ROL (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(50),
+    descripcion VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS AREA (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100)
+);
+
+CREATE TABLE IF NOT EXISTS CATEGORIA (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100)
+);
+
+-- 2. Entidades Principales
+CREATE TABLE IF NOT EXISTS USUARIO (
+    id SERIAL PRIMARY KEY,
+    rol_id INTEGER REFERENCES ROL(id),
+    rut VARCHAR(12) UNIQUE,
+    nombre VARCHAR(100),
+    password_hash VARCHAR(255),
+    activo BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS INVENTARIO (
+    id SERIAL PRIMARY KEY,
+    categoria_id INTEGER REFERENCES CATEGORIA(id),
+    codigo_barra VARCHAR(50) UNIQUE,
+    nombre_equipo VARCHAR(100),
+    cantidad_total INTEGER,
+    cantidad_disponible INTEGER,
+    estado_actual VARCHAR(50)
+);
+
+-- 3. Tablas de Proceso y Auditoría
+CREATE TABLE IF NOT EXISTS SOLICITUD (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER REFERENCES USUARIO(id),
+    area_id INTEGER REFERENCES AREA(id),
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado VARCHAR(50)
+);
+
+CREATE TABLE IF NOT EXISTS DETALLE_SOLICITUD (
+    id SERIAL PRIMARY KEY,
+    solicitud_id INTEGER REFERENCES SOLICITUD(id),
+    inventario_id INTEGER REFERENCES INVENTARIO(id),
+    cantidad_solicitada INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS HISTORIAL_MOVIMIENTO (
+    id SERIAL PRIMARY KEY,
+    inventario_id INTEGER REFERENCES INVENTARIO(id),
+    usuario_id INTEGER REFERENCES USUARIO(id),
+    estado_anterior VARCHAR(50),
+    estado_nuevo VARCHAR(50),
+    fecha_cambio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    justificacion VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS CICLO_ESTERILIZACION (
+    id SERIAL PRIMARY KEY,
+    operador_id INTEGER REFERENCES USUARIO(id),
+    maquina_autoclave VARCHAR(100),
+    fecha_inicio TIMESTAMP,
+    fecha_fin TIMESTAMP,
+    estado VARCHAR(50)
+);
+
+CREATE TABLE IF NOT EXISTS VINCULO_TRAZABILIDAD (
+    id SERIAL PRIMARY KEY,
+    ciclo_id INTEGER REFERENCES CICLO_ESTERILIZACION(id),
+    inventario_id INTEGER REFERENCES INVENTARIO(id),
+    cantidad_procesada INTEGER,
+    resultado VARCHAR(50)
+);
