@@ -1,18 +1,46 @@
 import React from 'react';
 
-export default function Modal({ isOpen, onClose, title, children }) {
+export default function Modal({ isOpen, onClose, content, children }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 transform transition-all p-6 space-y-4">
-        {/* Encabezado del modal */}
-        <div className="text-center space-y-2">
-            <h3 className="font-bold text-lg text-slate-900">{title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      {/* Contenedor blanco */}
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 relative">
+        {/* Botón X para cerrar */}
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
+        >
+          &times;
+        </button>
+
+        {/* Título */}
+        <h3 className="text-lg font-bold text-slate-800 mb-4">{content.title}</h3>
+
+        {/* Lista de movimientos */}
+        <div className="space-y-3 max-h-96 overflow-y-auto mb-6">
+          {content.items && content.items.length > 0 ? (
+            content.items.map((item, idx) => (
+              <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm">
+                <p className="font-semibold text-slate-700">{item.estado_nuevo || item.event}</p>
+                <p className="text-slate-500 text-xs">Destino: {item.destino_nombre || 'N/A'}</p>
+                <p className="text-slate-400 text-[10px] mt-1">
+                    {item.fecha_cambio ? new Date(item.fecha_cambio).toLocaleString() : item.time}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-slate-400">No hay historial disponible.</p>
+          )}
         </div>
-        
-        {/* Contenido dinámico */}
-        {children}
+
+        {/* Aquí renderizamos los botones u otros elementos pasados desde Ciclo.jsx */}
+        {children && (
+            <div className="mt-4 border-t pt-4">
+                {children}
+            </div>
+        )}
       </div>
     </div>
   );

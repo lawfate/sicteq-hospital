@@ -6,14 +6,8 @@ export default function Ciclo() {
   const [searchText, setSearchText] = useState("");
   const [activeBox, setActiveBox] = useState(null);
   const [logs, setLogs] = useState([]);
-  
   const [targetStage, setTargetStage] = useState(1);
-  const [rollbackReason, setRollbackReason] = useState("");
-
-  const [cajasDB] = useState([
-    { folio: "#FOL-1042", stage: 1 }, 
-    { folio: "#FOL-1043", stage: 3 },
-  ]);
+  const [rollbackReason, setRollbackReason] = useState(""); // Nuevo estado
 
   const steps = [
     { id: 1, name: "Recepción", icon: "fa-check" },
@@ -23,35 +17,59 @@ export default function Ciclo() {
     { id: 5, name: "Entrega", icon: "fa-truck-ramp-box" }
   ];
 
-  const handleSearch = () => {
-    const found = cajasDB.find(c => c.folio === searchText);
-    if (found) {
-        setActiveBox(found);
-        setTargetStage(found.stage);
-        setLogs([{ id: 1, event: "Inicio de Seguimiento", operator: "TENS Juan Carlos", time: new Date().toLocaleTimeString() }]);
-    } else {
-        alert("Folio no encontrado.");
+  const handleSearch = async () => {
+    try {
+      const id = searchText.replace('#FOL-', '');
+      const response = await fetch(`http://localhost:4000/api/trazabilidad/buscar/${id}`);
+      
+      if (!response.ok) throw new Error("Folio no encontrado");
+      
+      const data = await response.json();
+      setActiveBox({ folio: searchText, stage: data.area_destino_id || 1 }); 
+      setTargetStage(data.area_destino_id || 1);
+      setLogs([data]); 
+    } catch (err) {
+      alert("Folio no encontrado en la base de datos.");
     }
   };
 
-  const executeAction = () => {
+  const executeAction = async () => {
+    // VALIDACIÓN OBLIGATORIA DE RETROCESO
     if (targetStage < activeBox.stage && !rollbackReason.trim()) {
-        alert("ERROR: Debe ingresar el motivo técnico del retroceso.");
-        return;
+      alert("ERROR: Debe ingresar el motivo técnico del retroceso.");
+      return;
     }
 
-    const newLog = {
-        id: Date.now(),
-        event: `${targetStage}. ${steps[targetStage-1].name} ${targetStage < activeBox.stage ? '(RETROCESO)' : ''}`,
-        operator: "Enf. Ana María",
-        time: new Date().toLocaleTimeString(),
-        reason: rollbackReason
-    };
-    
-    setLogs([newLog, ...logs]);
-    setActiveBox({ ...activeBox, stage: targetStage });
-    setRollbackReason("");
-    setIsModalOpen(false);
+    try {
+      const id = searchText.replace('#FOL-', '');
+      const response = await fetch('http://localhost:4000/api/trazabilidad/actualizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            id: id, 
+            stage: targetStage,
+            reason: rollbackReason // Enviamos el motivo al backend
+        })
+      });
+
+      if (!response.ok) throw new Error("Error al actualizar estado");
+
+      const newLog = {
+          id: Date.now(),
+          event: `${targetStage}. ${steps[targetStage-1].name} ${targetStage < activeBox.stage ? '(RETROCESO)' : ''}`,
+          operator: "Enf. Ana María",
+          time: new Date().toLocaleTimeString(),
+          reason: rollbackReason
+      };
+      
+      setLogs([newLog, ...logs]);
+      setActiveBox({ ...activeBox, stage: targetStage });
+      setRollbackReason(""); // Limpiamos el motivo
+      setIsModalOpen(false);
+      alert("Etapa actualizada con éxito");
+    } catch (err) {
+      alert("No se pudo procesar la acción: " + err.message);
+    }
   };
 
   return (
@@ -65,7 +83,13 @@ export default function Ciclo() {
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 h-fit">
             <h3 className="font-bold text-slate-800 text-sm">Entrada de Acción</h3>
             <div className="space-y-3">
-                <input type="text" value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="#FOL-..." className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50" />
+                <input 
+                  type="text" 
+                  value={searchText} 
+                  onChange={(e) => setSearchText(e.target.value)} 
+                  placeholder="#FOL-..." 
+                  className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50" 
+                />
                 <button onClick={handleSearch} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm hover:bg-slate-800">Buscar</button>
                 
                 {activeBox && (
@@ -98,15 +122,11 @@ export default function Ciclo() {
                 
                 <div className="space-y-3">
                     <h4 className="text-xs font-bold text-slate-400 uppercase">Bitácora</h4>
-                    {logs.map(log => (
-                        <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                            <p className="font-bold text-slate-800">{log.event}</p>
-                            {log.reason && (
-                                <p className="text-red-700 font-semibold mt-1 bg-white p-2 rounded border border-red-200">
-                                    <span className="font-bold text-[10px] uppercase block text-red-400">Motivo de Desviación:</span> 
-                                    {log.reason}
-                                </p>
-                            )}
+                    {logs.map((log, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            <p className="font-bold text-slate-800">{log.event || "Actualización de estado"}</p>
+                            {log.reason && <p className="text-red-600 italic">Motivo: {log.reason}</p>}
+                            <p className="text-slate-500">{log.time || log.fecha_cambio}</p>
                         </div>
                     ))}
                 </div>
@@ -114,20 +134,27 @@ export default function Ciclo() {
         )}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Confirmar Acción">
-        <div className="space-y-4">
-            <p className="text-sm text-slate-600">¿Confirmas ejecutar: <strong>{steps[targetStage-1].name}</strong>?</p>
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        content={{ title: "Confirmar Acción", items: logs }}
+      >
+          <div className="space-y-4">
             {targetStage < activeBox?.stage && (
                 <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                     <label className="text-xs font-bold text-red-800 block mb-2">Motivo de Retroceso (Obligatorio)</label>
-                    <textarea className="w-full p-2 rounded text-sm" value={rollbackReason} onChange={(e) => setRollbackReason(e.target.value)}></textarea>
+                    <textarea 
+                        className="w-full p-2 rounded text-sm border border-red-300" 
+                        value={rollbackReason} 
+                        onChange={(e) => setRollbackReason(e.target.value)}
+                        placeholder="Escriba la justificación técnica..."
+                    ></textarea>
                 </div>
             )}
-            <div className="flex gap-3">
-                <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2 bg-slate-100 rounded-lg text-sm font-bold">Cancelar</button>
-                <button onClick={executeAction} className="flex-1 py-2 bg-sky-600 text-white rounded-lg text-sm font-bold">Confirmar</button>
-            </div>
-        </div>
+            <button onClick={executeAction} className="w-full bg-sky-600 text-white py-2 rounded-lg font-bold text-sm">
+                Confirmar
+            </button>
+          </div>
       </Modal>
     </section>
   );

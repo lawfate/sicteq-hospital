@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
-// Importamos la función que acabas de escribir en el controlador
-const { getDashboardData } = require('../controllers/dashboardController');
+const dashboardController = require('../controllers/dashboardController');
 
-// Definimos que cuando alguien llame a /api/dashboard/, ejecute esa función
-router.get('/', getDashboardData);
+// Ruta para obtener el resumen principal del dashboard
+router.get('/', dashboardController.getDashboardData);
+
+// Ruta para obtener el historial detallado de una caja (Opción A)
+router.get('/movimientos/:id', dashboardController.getHistorialCaja); 
 
 module.exports = router;
