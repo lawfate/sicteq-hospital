@@ -61,4 +61,4 @@ const getHistorialCaja = async (req, res) => {
     }
 };
 
-module.exports = { getDashboardData, getHistorialCajo }; // Asegúrate de exportar ambos
+module.exports = { getDashboardData, getHistorialCaja }; // Asegúrate de exportar ambos
