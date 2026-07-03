@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 const buscarFolio = async (req, res) => {
     // Limpiamos el ID para asegurar que solo contenga números
-    const id = parseInt(req.params.id.replace(/\D/g, '')); 
+    const id = parseInt(req.params.id.replace(/\D/g, ''), 10); 
     
     try {
         const invResult = await db.query(
@@ -44,7 +44,9 @@ const buscarFolio = async (req, res) => {
 };
 
 const actualizarEtapa = async (req, res) => {
-    const { id, stage, reason } = req.body; 
+    // Limpiamos el ID que viene del cuerpo de la petición
+    const id = parseInt(String(req.body.id).replace(/\D/g, ''), 10);
+    const { stage, reason } = req.body; 
     
     // Validación de campos requeridos
     if (!id || stage === undefined || !reason) {
