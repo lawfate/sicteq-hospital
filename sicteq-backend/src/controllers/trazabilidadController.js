@@ -1,6 +1,7 @@
 const db = require('../config/db');
 
 const buscarFolio = async (req, res) => {
+    // Limpiamos el ID para asegurar que solo contenga números
     const id = parseInt(req.params.id.replace(/\D/g, '')); 
     
     try {
@@ -15,6 +16,7 @@ const buscarFolio = async (req, res) => {
         
         const inventario_id = invResult.rows[0].inventario_id;
 
+        // Si el registro existe pero no tiene equipo (nulo), devolvemos el registro solo
         if (inventario_id === null || inventario_id === undefined) {
             const fallbackResult = await db.query(`
                 SELECT h.*, a.nombre AS destino_nombre 
@@ -25,6 +27,7 @@ const buscarFolio = async (req, res) => {
             return res.json(fallbackResult.rows);
         }
 
+        // Si tiene inventario_id, buscamos todo el historial relacionado
         const result = await db.query(`
             SELECT h.*, a.nombre AS destino_nombre 
             FROM HISTORIAL_MOVIMIENTO h
@@ -41,10 +44,9 @@ const buscarFolio = async (req, res) => {
 };
 
 const actualizarEtapa = async (req, res) => {
-    // Recibimos los datos del frontend
     const { id, stage, reason } = req.body; 
     
-    // Validamos que los datos lleguen correctamente
+    // Validación de campos requeridos
     if (!id || stage === undefined || !reason) {
         return res.status(400).json({ error: "Datos incompletos: se requiere id, stage y reason." });
     }
@@ -65,7 +67,7 @@ const actualizarEtapa = async (req, res) => {
             return res.status(400).json({ error: "Este folio no tiene un equipo asignado." });
         }
 
-        // El stage llega desde el frontend. Si es un número (ej: 2), lo guardamos como string
+        // Formatear el estado y la justificación
         const estadoFormateado = typeof stage === 'string' ? stage : `Etapa ${stage}`;
         const justificacionFinal = reason.trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
         
@@ -75,7 +77,6 @@ const actualizarEtapa = async (req, res) => {
             VALUES ($1, $2, NOW(), $3, $4)
         `;
         
-        // Usamos area_destino_id anterior para mantener la consistencia
         const values = [inventario_id, estadoFormateado, area_destino_id, justificacionFinal];
         
         await db.query(query, values);

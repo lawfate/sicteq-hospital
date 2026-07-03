@@ -1,8 +1,26 @@
-const pool = require('../config/db'); // Asumiendo que tienes tu conexión configurada aquí
+const pool = require('../config/db');
+
+// Asegúrate de que buscarFolio esté definida aquí
+const buscarFolio = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = 'SELECT * FROM solicitud WHERE id = $1';
+        const result = await pool.query(query, [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ mensaje: "Solicitud no encontrada" });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error("Error al buscar folio:", error);
+        res.status(500).json({ mensaje: "Error interno al buscar la solicitud" });
+    }
+};
 
 const actualizarEtapa = async (req, res) => {
     const { id, stage, reason } = req.body;
 
+    // Validación básica de campos requeridos
     if (!id || !stage || !reason) {
         return res.status(400).json({ mensaje: "Faltan datos requeridos (id, stage, reason)" });
     }
