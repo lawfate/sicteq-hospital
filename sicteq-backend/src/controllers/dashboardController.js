@@ -10,7 +10,7 @@ const getDashboardData = async (req, res) => {
                 (SELECT COUNT(*) FROM INVENTARIO) as total_equipos
         `);
 
-        // Aquí ya estás trayendo 'a.nombre' como 'destino'
+        // Historial de trazabilidad (se mantiene igual)
         const movimientos = await db.query(`
             SELECT h.*, a.nombre AS destino
             FROM HISTORIAL_MOVIMIENTO h
@@ -18,18 +18,19 @@ const getDashboardData = async (req, res) => {
             ORDER BY h.fecha_cambio DESC LIMIT 5
         `);
 
+        // ACTUALIZADO: Adaptado para leer 'tipo_cirugia' y sacar la caja de 'observaciones' 
+        // ya que aún no tenemos la tabla intermedia conectada.
         const criticas = await db.query(`
             SELECT 
                 s.id AS solicitud_id,
-                i.nombre_equipo AS caja_requerida,
+                s.tipo_cirugia,
+                s.observaciones AS caja_requerida,
                 a.nombre AS pabellon,
                 s.estado AS estado_actual
             FROM SOLICITUD s
             JOIN AREA a ON s.area_id = a.id
-            JOIN DETALLE_SOLICITUD ds ON ds.solicitud_id = s.id
-            JOIN INVENTARIO i ON ds.inventario_id = i.id
             WHERE s.estado IN ('Pendiente', 'En Preparación', 'Listo')
-            ORDER BY s.fecha_creacion DESC LIMIT 5
+            ORDER BY s.id DESC LIMIT 5
         `);
 
         res.json({
@@ -61,4 +62,4 @@ const getHistorialCaja = async (req, res) => {
     }
 };
 
-module.exports = { getDashboardData, getHistorialCaja }; // Asegúrate de exportar ambos
+module.exports = { getDashboardData, getHistorialCaja };

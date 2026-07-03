@@ -12,16 +12,10 @@ import Inventario from './components/Inventario'
 function App() {
   const [user, setUser] = useState(null);
 
-  const handleLogin = (role) => {
-    const roleMap = {
-      'Enfermera': { name: "Enf. Ana María", role: "Enfermera" },
-      'TENS': { name: "TENS Juan Carlos", role: "TENS" },
-      'IT': { name: "IT Matías Olguín", role: "IT" }
-    };
-    
-    setUser(roleMap[role]);
+  // Lógica de Login actualizada para recibir los datos reales desde la BD
+  const handleLogin = (userData) => {
+    setUser(userData);
   };
-
 
   if (!user) {
     return <Login onLogin={handleLogin} />;
@@ -38,7 +32,10 @@ function App() {
           <main className="flex-1 overflow-y-auto p-6">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/solicitudes" element={<Solicitudes />} />
+                
+                {/* AÑADIDO EL user AQUÍ PARA QUE LA ENFERMERA QUEDE REGISTRADA */}
+                <Route path="/solicitudes" element={<Solicitudes user={user} />} />
+                
                 <Route path="/ciclo" element={<Ciclo />} />
                 {/* Importante: Pasamos el user a Vinculo para que el control de acceso funcione */}
                 <Route path="/vinculo" element={<Vinculo user={user} />} />

@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const trazabilidadController = require('../controllers/trazabilidadController');
+const { buscarFolio, actualizarEtapa } = require('../controllers/trazabilidadController');
 
-router.get('/buscar/:id', trazabilidadController.buscarFolio);
-router.post('/actualizar', trazabilidadController.actualizarEtapa);
+router.get('/buscar/:id', buscarFolio);
+router.post('/actualizar', actualizarEtapa);
 
 module.exports = router;

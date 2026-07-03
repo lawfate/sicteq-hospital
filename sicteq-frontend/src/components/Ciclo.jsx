@@ -7,7 +7,7 @@ export default function Ciclo() {
   const [activeBox, setActiveBox] = useState(null);
   const [logs, setLogs] = useState([]);
   const [targetStage, setTargetStage] = useState(1);
-  const [rollbackReason, setRollbackReason] = useState(""); // Nuevo estado
+  const [rollbackReason, setRollbackReason] = useState("");
 
   const steps = [
     { id: 1, name: "Recepción", icon: "fa-check" },
@@ -17,24 +17,48 @@ export default function Ciclo() {
     { id: 5, name: "Entrega", icon: "fa-truck-ramp-box" }
   ];
 
+  // Definimos la URL base usando la variable de entorno de Vite o el fallback local
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const handleSearch = async () => {
     try {
       const id = searchText.replace('#FOL-', '');
-      const response = await fetch(`http://localhost:4000/api/trazabilidad/buscar/${id}`);
+      const response = await fetch(`${API_URL}/api/trazabilidad/buscar/${id}`);
       
-      if (!response.ok) throw new Error("Folio no encontrado");
+      // 1. Si el backend responde con error (404, 500, etc), extraemos el mensaje real
+      if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || errorData.message || `Error del servidor: ${response.status}`);
+      }
       
       const data = await response.json();
-      setActiveBox({ folio: searchText, stage: data.area_destino_id || 1 }); 
-      setTargetStage(data.area_destino_id || 1);
-      setLogs([data]); 
+      
+      // 2. Validamos que el backend realmente envió un historial y no un array vacío
+      if (!data || data.length === 0) {
+          throw new Error("El folio no tiene un historial válido asociado (array vacío).");
+      }
+      
+      const ultimoRegistro = data[0]; 
+      
+      // 3. Validamos que el registro tenga la estructura esperada
+      if (!ultimoRegistro || !ultimoRegistro.area_destino_id) {
+          console.warn("Registro devuelto por la BD está incompleto:", ultimoRegistro);
+      }
+      
+      setActiveBox({ 
+          folio: searchText, 
+          stage: parseInt(ultimoRegistro?.area_destino_id) || 1 
+      }); 
+      setTargetStage(parseInt(ultimoRegistro?.area_destino_id) || 1);
+      
+      setLogs(data); 
     } catch (err) {
-      alert("Folio no encontrado en la base de datos.");
+      console.error(">>> ERROR DETALLADO:", err);
+      alert("Problema al buscar: " + err.message); 
     }
   };
 
   const executeAction = async () => {
-    // VALIDACIÓN OBLIGATORIA DE RETROCESO
     if (targetStage < activeBox.stage && !rollbackReason.trim()) {
       alert("ERROR: Debe ingresar el motivo técnico del retroceso.");
       return;
@@ -42,31 +66,24 @@ export default function Ciclo() {
 
     try {
       const id = searchText.replace('#FOL-', '');
-      const response = await fetch('http://localhost:4000/api/trazabilidad/actualizar', {
+      const response = await fetch(`${API_URL}/api/trazabilidad/actualizar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             id: id, 
             stage: targetStage,
-            reason: rollbackReason // Enviamos el motivo al backend
+            reason: rollbackReason
         })
       });
 
       if (!response.ok) throw new Error("Error al actualizar estado");
 
-      const newLog = {
-          id: Date.now(),
-          event: `${targetStage}. ${steps[targetStage-1].name} ${targetStage < activeBox.stage ? '(RETROCESO)' : ''}`,
-          operator: "Enf. Ana María",
-          time: new Date().toLocaleTimeString(),
-          reason: rollbackReason
-      };
-      
-      setLogs([newLog, ...logs]);
-      setActiveBox({ ...activeBox, stage: targetStage });
-      setRollbackReason(""); // Limpiamos el motivo
+      setRollbackReason("");
       setIsModalOpen(false);
       alert("Etapa actualizada con éxito");
+      
+      handleSearch();
+      
     } catch (err) {
       alert("No se pudo procesar la acción: " + err.message);
     }
@@ -124,9 +141,11 @@ export default function Ciclo() {
                     <h4 className="text-xs font-bold text-slate-400 uppercase">Bitácora</h4>
                     {logs.map((log, idx) => (
                         <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                            <p className="font-bold text-slate-800">{log.event || "Actualización de estado"}</p>
-                            {log.reason && <p className="text-red-600 italic">Motivo: {log.reason}</p>}
-                            <p className="text-slate-500">{log.time || log.fecha_cambio}</p>
+                            <p className="font-bold text-slate-800">{log.estado_nuevo || log.event || "Actualización de estado"}</p>
+                            {log.justificacion && log.justificacion !== `Avance a Etapa ${log.area_destino_id}` && (
+                                <p className="text-red-600 italic">Motivo/Comentario: {log.justificacion}</p>
+                            )}
+                            <p className="text-slate-500">{log.fecha_cambio ? new Date(log.fecha_cambio).toLocaleString() : log.time}</p>
                         </div>
                     ))}
                 </div>
@@ -140,17 +159,17 @@ export default function Ciclo() {
         content={{ title: "Confirmar Acción", items: logs }}
       >
           <div className="space-y-4">
-            {targetStage < activeBox?.stage && (
-                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                    <label className="text-xs font-bold text-red-800 block mb-2">Motivo de Retroceso (Obligatorio)</label>
-                    <textarea 
-                        className="w-full p-2 rounded text-sm border border-red-300" 
-                        value={rollbackReason} 
-                        onChange={(e) => setRollbackReason(e.target.value)}
-                        placeholder="Escriba la justificación técnica..."
-                    ></textarea>
-                </div>
-            )}
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <label className="text-xs font-bold text-slate-700 block mb-2">
+                      {targetStage < activeBox?.stage ? "Motivo de Retroceso (Obligatorio)" : "Comentario Adicional (Opcional)"}
+                  </label>
+                  <textarea 
+                      className="w-full p-2 rounded text-sm border border-slate-300" 
+                      value={rollbackReason} 
+                      onChange={(e) => setRollbackReason(e.target.value)}
+                      placeholder="Escriba aquí..."
+                  ></textarea>
+              </div>
             <button onClick={executeAction} className="w-full bg-sky-600 text-white py-2 rounded-lg font-bold text-sm">
                 Confirmar
             </button>
