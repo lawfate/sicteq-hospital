@@ -13,14 +13,12 @@ const solicitudesRoutes = require('./routes/solicitudesRoutes');
 const inventarioRoutes = require('./routes/inventarioRoutes');
 
 // Middlewares
+// Configuración de CORS permisiva para depuración
 app.use(cors({
-    origin: [
-        'https://sicteq-frontend.vercel.app', 
-        'https://sicteq-hospital-dqlo-9ht49ncuw-diegoalarcon42-6755s-projects.vercel.app', 
-        'http://localhost:5173'
-    ], 
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
+    origin: '*', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json()); // NECESARIO para procesar peticiones JSON
 
