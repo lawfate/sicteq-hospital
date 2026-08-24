@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { apiFetch } from '../api';
 
 const TABS = [
   { id: 'trazabilidad', label: 'Trazabilidad', icon: 'fa-route' },
@@ -134,7 +133,7 @@ function ReporteTrazabilidad() {
       if (codigo.trim()) params.set('codigo', codigo.trim().toUpperCase());
       if (desde) params.set('desde', desde);
       if (hasta) params.set('hasta', hasta);
-      const res = await fetch(`${API_URL}/api/reportes/trazabilidad?${params.toString()}`);
+      const res = await apiFetch(`/api/reportes/trazabilidad?${params.toString()}`);
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -191,7 +190,7 @@ function ReporteSolicitudes() {
       if (estado) params.set('estado', estado);
       if (desde) params.set('desde', desde);
       if (hasta) params.set('hasta', hasta);
-      const res = await fetch(`${API_URL}/api/solicitudes?${params.toString()}`);
+      const res = await apiFetch(`/api/solicitudes?${params.toString()}`);
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -202,7 +201,7 @@ function ReporteSolicitudes() {
   };
 
   useEffect(() => {
-    fetch(`${API_URL}/api/solicitudes/areas`)
+    apiFetch(`/api/solicitudes/areas`)
       .then(res => res.json())
       .then(data => setAreas(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error al cargar áreas:', err));
@@ -261,7 +260,7 @@ function ReporteAlertas() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/alertas`);
+      const res = await apiFetch(`/api/alertas`);
       const data = await res.json();
       setStockBajo(Array.isArray(data.stockBajo) ? data.stockBajo : []);
       setCajasPorVencer(Array.isArray(data.cajasPorVencer) ? data.cajasPorVencer : []);
@@ -330,7 +329,7 @@ function ReporteVinculos() {
       if (codigo.trim()) params.set('codigo', codigo.trim().toUpperCase());
       if (desde) params.set('desde', desde);
       if (hasta) params.set('hasta', hasta);
-      const res = await fetch(`${API_URL}/api/reportes/vinculos?${params.toString()}`);
+      const res = await apiFetch(`/api/reportes/vinculos?${params.toString()}`);
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {

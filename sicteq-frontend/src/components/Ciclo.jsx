@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Modal from './Modal';
+import { apiFetch } from '../api';
 
 // Deriva el número de etapa desde el texto de estado_nuevo, ej. "Etapa 3".
 // area_destino_id NO sirve para esto: esa columna referencia el pabellón/área
@@ -47,15 +48,12 @@ export default function Ciclo() {
     { id: 6, name: "Entrega", icon: "fa-truck-ramp-box" }
   ];
 
-  // Definimos la URL base usando la variable de entorno de Vite o el fallback local
-  const API_URL = import.meta.env.VITE_API_URL;
-
   const handleSearch = async () => {
     try {
       const codigo = searchText.trim().toUpperCase();
       if (!codigo) return;
 
-      const response = await fetch(`${API_URL}/api/trazabilidad/buscar/${encodeURIComponent(codigo)}`);
+      const response = await apiFetch(`/api/trazabilidad/buscar/${encodeURIComponent(codigo)}`);
 
       // 1. Si el backend responde con error (404, 500, etc), extraemos el mensaje real
       if (!response.ok) {
@@ -89,7 +87,7 @@ export default function Ciclo() {
 
       // Dirección caja -> paciente de la trazabilidad bidireccional: qué
       // paciente(s) se le vincularon a esta caja física, si los hay.
-      fetch(`${API_URL}/api/cajas/${encodeURIComponent(codigo)}/pacientes`)
+      apiFetch(`/api/cajas/${encodeURIComponent(codigo)}/pacientes`)
         .then(r => r.ok ? r.json() : [])
         .then(p => setPacientesVinculados(Array.isArray(p) ? p : []))
         .catch(() => setPacientesVinculados([]));
@@ -145,7 +143,7 @@ export default function Ciclo() {
         body.vigenciaDias = vigenciaDias;
       }
 
-      const response = await fetch(`${API_URL}/api/trazabilidad/actualizar`, {
+      const response = await apiFetch(`/api/trazabilidad/actualizar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { apiFetch } from '../api';
 
 export default function Vinculo({ user }) {
   const location = useLocation();
@@ -28,7 +27,7 @@ export default function Vinculo({ user }) {
     (user?.role === 'TENS' && isDespachoMode);
 
   const loadPacientes = () => {
-    fetch(`${API_URL}/api/pacientes`)
+    apiFetch(`/api/pacientes`)
       .then(res => res.json())
       .then(data => setPacientes(Array.isArray(data) ? data : []))
       .catch(err => console.error("Error al cargar pacientes:", err));
@@ -49,7 +48,7 @@ export default function Vinculo({ user }) {
   // Trae la ficha completa (con historial real de cajas vinculadas) al seleccionar.
   const selectPatient = async (rut) => {
     try {
-      const response = await fetch(`${API_URL}/api/pacientes/${encodeURIComponent(rut)}`);
+      const response = await apiFetch(`/api/pacientes/${encodeURIComponent(rut)}`);
       if (!response.ok) throw new Error('No se pudo cargar la ficha del paciente');
       const data = await response.json();
       setSelectedPatient(data);
@@ -67,7 +66,7 @@ export default function Vinculo({ user }) {
     setVinculoStatus({ loading: true, message: '', type: '' });
 
     try {
-      const response = await fetch(`${API_URL}/api/vinculos`, {
+      const response = await apiFetch(`/api/vinculos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rut: selectedPatient.rut, codigo_caja: cajaCode, usuario_id: user.id })
@@ -98,7 +97,7 @@ export default function Vinculo({ user }) {
     setStatus({ loading: true, message: '', type: '' });
 
     try {
-      const response = await fetch(`${API_URL}/api/solicitudes/${solicitudId}/despachar`, {
+      const response = await apiFetch(`/api/solicitudes/${solicitudId}/despachar`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caja_codigo: cajaCode, usuario_id: user.id })

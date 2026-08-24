@@ -27,12 +27,19 @@ export default function Login({ onLogin }) {
         throw new Error(data.error || 'Error al conectar con el servidor');
       }
 
-      // Si es exitoso, pasamos el usuario real (que viene de la BD) a App.jsx
-      onLogin({
+      // Guardamos el token para que apiFetch lo adjunte a cada llamada, y
+      // para poder mantener la sesión si se recarga la página.
+      localStorage.setItem('sicteq_token', data.token);
+
+      const user = {
         id: data.user.id,
         name: data.user.nombre,
         role: data.user.rol
-      });
+      };
+      localStorage.setItem('sicteq_user', JSON.stringify(user));
+
+      // Si es exitoso, pasamos el usuario real (que viene de la BD) a App.jsx
+      onLogin(user);
 
     } catch (err) {
       setError(err.message);

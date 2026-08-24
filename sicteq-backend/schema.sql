@@ -29,6 +29,13 @@
 -- pasar una caja por la etapa de Almacenamiento (hoy + vigencia en días),
 -- para poder alertar sobre rotación de stock por vencimiento de empaque,
 -- algo que antes no se registraba en ningún lado.
+--
+-- 2026-08-24 (5): usuario.password_hash pasa a contener hashes bcrypt reales
+-- (antes tenía la contraseña en texto plano, comparada tal cual en el
+-- login). Migración one-off sobre los 3 usuarios existentes: mismo valor de
+-- contraseña, solo cambia cómo se guarda. El login ahora también emite un
+-- JWT (ver src/config/jwt.js y src/middleware/authMiddleware.js) que se
+-- exige en todos los endpoints salvo /api/auth y /api/health.
 -- ==========================================
 
 -- 1. TABLAS MAESTRAS (Sin dependencias)

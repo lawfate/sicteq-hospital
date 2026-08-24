@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; // <-- NUEVO: Para navegar a la vista de Vínculo
 import Modal from './Modal';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { apiFetch } from '../api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -18,17 +17,17 @@ export default function Dashboard() {
   const [alertas, setAlertas] = useState({ stockBajo: [], cajasPorVencer: [] });
 
   useEffect(() => {
-    fetch(`${API_URL}/api/dashboard`)
+    apiFetch(`/api/dashboard`)
       .then(res => res.json())
       .then(json => setData(json))
       .catch(err => console.error("Error cargando dashboard:", err));
 
-    fetch(`${API_URL}/api/cajas/circulacion`)
+    apiFetch(`/api/cajas/circulacion`)
       .then(res => res.json())
       .then(json => setCajasCirculacion(Array.isArray(json) ? json : []))
       .catch(err => console.error("Error cargando cajas en circulación:", err));
 
-    fetch(`${API_URL}/api/alertas`)
+    apiFetch(`/api/alertas`)
       .then(res => res.json())
       .then(json => setAlertas({
         stockBajo: Array.isArray(json.stockBajo) ? json.stockBajo : [],
@@ -48,7 +47,7 @@ export default function Dashboard() {
         setIsModalOpen(true);
         return;
       }
-      const response = await fetch(`${API_URL}/api/dashboard/movimientos/${mov.inventario_id}`);
+      const response = await apiFetch(`/api/dashboard/movimientos/${mov.inventario_id}`);
       const data = await response.json();
       setModalContent({
         title: `Historial: ${mov.justificacion}`,

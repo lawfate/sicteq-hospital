@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { apiFetch } from '../api';
 
 export default function Inventario() {
   const [stockData, setStockData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/inventario`)
+    apiFetch(`/api/inventario`)
       .then(res => res.json())
       .then(data => setStockData(Array.isArray(data) ? data : []))
       .catch(err => console.error("Error al cargar inventario:", err))

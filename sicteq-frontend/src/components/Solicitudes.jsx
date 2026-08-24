@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { apiFetch } from '../api';
 
 // Importante: Recibimos el 'user' como prop (la enfermera conectada)
 export default function Solicitudes({ user }) {
@@ -15,7 +14,7 @@ export default function Solicitudes({ user }) {
 
   // 1. Cargar las 22 áreas desde el backend al iniciar la vista
   useEffect(() => {
-    fetch(`${API_URL}/api/solicitudes/areas`)
+    apiFetch(`/api/solicitudes/areas`)
       .then(res => res.json())
       .then(data => {
         setAreas(data);
@@ -33,7 +32,7 @@ export default function Solicitudes({ user }) {
     setStatus({ loading: true, message: '', type: '' });
 
     try {
-      const response = await fetch(`${API_URL}/api/solicitudes`, {
+      const response = await apiFetch(`/api/solicitudes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

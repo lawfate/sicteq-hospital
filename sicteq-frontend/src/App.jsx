@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Login from './components/Login'
 import Sidebar from './components/Sidebar'
@@ -12,11 +12,40 @@ import Reportes from './components/Reportes'
 
 function App() {
   const [user, setUser] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Antes la sesión vivía solo en useState: un F5, o abrir un link en
+  // pestaña nueva, botaba al login sin ninguna razón real. El token y el
+  // usuario quedan en localStorage (los guarda Login.jsx), así que acá solo
+  // hay que releerlos al montar.
+  useEffect(() => {
+    const token = localStorage.getItem('sicteq_token');
+    const storedUser = localStorage.getItem('sicteq_user');
+    if (token && storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem('sicteq_token');
+        localStorage.removeItem('sicteq_user');
+      }
+    }
+    setCheckingSession(false);
+  }, []);
 
   // Lógica de Login actualizada para recibir los datos reales desde la BD
   const handleLogin = (userData) => {
     setUser(userData);
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem('sicteq_token');
+    localStorage.removeItem('sicteq_user');
+    setUser(null);
+  };
+
+  if (checkingSession) {
+    return null;
+  }
 
   if (!user) {
     return <Login onLogin={handleLogin} />;
@@ -26,7 +55,7 @@ function App() {
     <BrowserRouter>
       <div className="bg-slate-100 font-sans text-slate-800 flex h-screen overflow-hidden">
         {/* Pasamos el usuario dinámico y la función de logout */}
-        <Sidebar onLogout={() => setUser(null)} user={user} />
+        <Sidebar onLogout={handleLogout} user={user} />
         
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header />
