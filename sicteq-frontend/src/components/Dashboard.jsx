@@ -14,6 +14,7 @@ export default function Dashboard() {
     criticas: []
   });
   const [cajasCirculacion, setCajasCirculacion] = useState([]);
+  const [showCajasCirculacion, setShowCajasCirculacion] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/api/dashboard`)
@@ -140,55 +141,63 @@ export default function Dashboard() {
         </table>
       </div>
 
-      {/* CAJAS FÍSICAS EN CIRCULACIÓN */}
+      {/* CAJAS FÍSICAS EN CIRCULACIÓN (colapsable) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-6 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-          <h3 className="font-bold text-slate-800">Cajas en Circulación</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Unidades físicas individuales con movimientos activos, antes de su eliminación.</p>
-        </div>
-        <table className="w-full text-left text-sm text-slate-600">
-          <thead className="text-xs uppercase tracking-wider text-slate-400 border-b">
-            <tr>
-              <th className="px-6 py-4">Código de Caja</th>
-              <th className="px-6 py-4">Tipo</th>
-              <th className="px-6 py-4">Destino Actual</th>
-              <th className="px-6 py-4">Última Actualización</th>
-              <th className="px-6 py-4">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cajasCirculacion.map((caja) => (
-              <tr key={caja.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 font-bold text-slate-800 font-mono">{caja.codigo_caja}</td>
-                <td className="px-6 py-4">{caja.nombre_equipo}</td>
-                <td className="px-6 py-4 text-slate-500">{caja.destino_nombre || 'Sin destino'}</td>
-                <td className="px-6 py-4 text-xs text-slate-500">{caja.ultima_actualizacion ? formatDate(caja.ultima_actualizacion) : '—'}</td>
-                <td className="px-6 py-4">
-                  {caja.estado_nuevo ? (
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      caja.estado_nuevo === 'Despachado' ? 'bg-emerald-100 text-emerald-700' :
-                      caja.estado_nuevo === 'Alerta Merma' ? 'bg-amber-100 text-amber-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
-                      {caja.estado_nuevo}
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
-                      Sin movimientos aún
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {cajasCirculacion.length === 0 && (
+        <button
+          onClick={() => setShowCajasCirculacion(prev => !prev)}
+          className="w-full px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between text-left hover:bg-slate-100 transition-colors"
+        >
+          <div>
+            <h3 className="font-bold text-slate-800">Cajas en Circulación <span className="text-slate-400 font-normal">({cajasCirculacion.length})</span></h3>
+            <p className="text-xs text-slate-500 mt-0.5">Unidades físicas individuales con movimientos activos, antes de su eliminación.</p>
+          </div>
+          <i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${showCajasCirculacion ? 'rotate-180' : ''}`}></i>
+        </button>
+        {showCajasCirculacion && (
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="text-xs uppercase tracking-wider text-slate-400 border-b">
               <tr>
-                <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
-                  No hay cajas físicas registradas en circulación.
-                </td>
+                <th className="px-6 py-4">Código de Caja</th>
+                <th className="px-6 py-4">Tipo</th>
+                <th className="px-6 py-4">Destino Actual</th>
+                <th className="px-6 py-4">Última Actualización</th>
+                <th className="px-6 py-4">Estado</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {cajasCirculacion.map((caja) => (
+                <tr key={caja.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-bold text-slate-800 font-mono">{caja.codigo_caja}</td>
+                  <td className="px-6 py-4">{caja.nombre_equipo}</td>
+                  <td className="px-6 py-4 text-slate-500">{caja.destino_nombre || 'Sin destino'}</td>
+                  <td className="px-6 py-4 text-xs text-slate-500">{caja.ultima_actualizacion ? formatDate(caja.ultima_actualizacion) : '—'}</td>
+                  <td className="px-6 py-4">
+                    {caja.estado_nuevo ? (
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        caja.estado_nuevo === 'Despachado' ? 'bg-emerald-100 text-emerald-700' :
+                        caja.estado_nuevo === 'Alerta Merma' ? 'bg-amber-100 text-amber-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {caja.estado_nuevo}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+                        Sin movimientos aún
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {cajasCirculacion.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                    No hay cajas físicas registradas en circulación.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* TABLA DE TRAZABILIDAD */}

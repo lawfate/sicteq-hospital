@@ -26,9 +26,11 @@ export default function Vinculo({ user }) {
     { rut: "15.342.789-0", nombre: "Juan Alberto Díaz", edad: "61 años", pabellón: "Pabellón 2", diagnostico: "Colecistectomía", historial: [] }
   ];
 
-  const filteredPatients = searchTerm 
+  // Sin texto de búsqueda mostramos todos los pacientes (para poder verlos,
+  // no solo encontrarlos escribiendo); con texto, filtramos por RUT o nombre.
+  const filteredPatients = searchTerm
     ? DB_PACIENTES.filter(p => p.rut.includes(searchTerm) || p.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-    : [];
+    : DB_PACIENTES;
 
   // LOGICA DE ROLES MEJORADA: 
   const isAuthorized = 
@@ -125,47 +127,91 @@ export default function Vinculo({ user }) {
 
       {/* VISTA 2: MODO VÍNCULO CLÍNICO */}
       {isAuthorized && !isDespachoMode && (
+        <div className="space-y-6">
+
+          {/* Sección de pacientes: buscador + listado visible con estado de vínculo */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                      <h3 className="font-bold text-slate-900 text-lg"><i className="fa-solid fa-users text-sky-600 mr-2"></i>Pacientes</h3>
+                      <p className="text-xs text-slate-500">Buscá por RUT o nombre, o revisá quién ya tiene una caja vinculada.</p>
+                  </div>
+                  <input
+                      type="text"
+                      placeholder="Buscar por RUT o nombre..."
+                      className="w-full sm:w-72 p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 outline-none"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+              </div>
+              <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="text-xs uppercase tracking-wider text-slate-400 border-b bg-slate-50">
+                      <tr>
+                          <th className="px-6 py-3">RUT</th>
+                          <th className="px-6 py-3">Nombre</th>
+                          <th className="px-6 py-3">Pabellón</th>
+                          <th className="px-6 py-3">Caja Vinculada</th>
+                          <th className="px-6 py-3 text-center">Acción</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {filteredPatients.map(p => (
+                          <tr key={p.rut} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selectedPatient?.rut === p.rut ? 'bg-sky-50' : ''}`}>
+                              <td className="px-6 py-3 font-mono text-slate-500">{p.rut}</td>
+                              <td className="px-6 py-3 font-bold text-slate-800">{p.nombre}</td>
+                              <td className="px-6 py-3">{p.pabellón}</td>
+                              <td className="px-6 py-3">
+                                  {p.historial.length > 0 ? (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Vinculada ({p.historial.length})</span>
+                                  ) : (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Sin vincular</span>
+                                  )}
+                              </td>
+                              <td className="px-6 py-3 text-center">
+                                  <button type="button" onClick={() => setSelectedPatient(p)} className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+                                      Seleccionar
+                                  </button>
+                              </td>
+                          </tr>
+                      ))}
+                      {filteredPatients.length === 0 && (
+                          <tr>
+                              <td colSpan="5" className="px-6 py-8 text-center text-slate-400">No se encontró ningún paciente con ese RUT o nombre.</td>
+                          </tr>
+                      )}
+                  </tbody>
+              </table>
+          </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          
+
           {/* Columna Izquierda: Formulario Vínculo */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
               <div className="border-b border-slate-100 pb-3">
                   <h3 className="font-bold text-slate-900 text-lg"><i className="fa-solid fa-link text-sky-600 mr-2"></i>Asociación Instrumental - Paciente</h3>
-                  <p className="text-xs text-slate-500">Busca un RUT para abrir su historial y emparejar la caja quirúrgica recepcionada.</p>
+                  <p className="text-xs text-slate-500">Seleccioná un paciente de la lista de arriba y emparejalo con la caja quirúrgica recepcionada.</p>
               </div>
-              
+
               <form onSubmit={handleVinculoClinico} className="space-y-4">
-                  <div className="relative">
-                      <label className="text-xs font-bold text-slate-500 uppercase">Digite RUN del Paciente</label>
-                      <input 
-                          type="text" 
-                          placeholder="Ej: 20.145..." 
-                          className="w-full mt-1 p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 outline-none"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                      {filteredPatients.length > 0 && (
-                          <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
-                              {filteredPatients.map(p => (
-                                  <button key={p.rut} type="button" onClick={() => { setSelectedPatient(p); setSearchTerm(''); }} className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 text-xs transition-colors">
-                                      <span className="font-bold text-slate-700 block">{p.nombre}</span>
-                                      <span className="text-slate-400 font-mono">{p.rut}</span>
-                                  </button>
-                              ))}
-                          </div>
+                  <div className="p-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Paciente seleccionado</span>
+                      {selectedPatient ? (
+                          <span className="font-bold text-slate-800">{selectedPatient.nombre} <span className="text-slate-400 font-mono font-normal">({selectedPatient.rut})</span></span>
+                      ) : (
+                          <span className="text-slate-400 italic">Ninguno — seleccioná uno en la tabla de arriba</span>
                       )}
                   </div>
 
                   <div className="flex flex-col gap-1">
                       <label className="text-xs font-bold text-slate-500 uppercase">Código de Caja Utilizada</label>
-                      <input 
-                          type="text" 
-                          className="p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-sky-500 uppercase" 
+                      <input
+                          type="text"
+                          className="p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-sky-500 uppercase"
                           value={cajaCode}
                           onChange={(e) => setCajaCode(e.target.value.toUpperCase())}
                       />
                   </div>
-                  
+
                   <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg text-xs transition-colors shadow-md flex items-center justify-center gap-2">
                       <i className="fa-solid fa-floppy-disk"></i> Confirmar Asociación Clínica
                   </button>
@@ -214,10 +260,11 @@ export default function Vinculo({ user }) {
                   <div className="text-center flex flex-col items-center justify-center h-full text-slate-400 mt-16">
                       <i className="fa-solid fa-id-card-clip text-5xl mb-4 text-slate-200"></i>
                       <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">Esperando Selección</h4>
-                      <p className="text-xs max-w-xs mt-2 mx-auto">Digite y seleccione un paciente en el buscador para ver su ficha.</p>
+                      <p className="text-xs max-w-xs mt-2 mx-auto">Seleccioná un paciente en la tabla de arriba para ver su ficha.</p>
                   </div>
               )}
           </div>
+        </div>
         </div>
       )}
     </div>
