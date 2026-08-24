@@ -38,7 +38,7 @@ const buscarCaja = async (req, res) => {
 
 const actualizarEtapa = async (req, res) => {
     const codigo = String(req.body.codigo || '').trim().toUpperCase();
-    const { stage, reason } = req.body;
+    const { stage, reason, metodo, temperatura, presion, tiempoMinutos } = req.body;
 
     // Validación de campos requeridos. El motivo (reason) es opcional al avanzar
     // de etapa -- el frontend solo lo exige para retrocesos; si viene vacío se usa
@@ -72,13 +72,24 @@ const actualizarEtapa = async (req, res) => {
         const estadoFormateado = typeof stage === 'string' ? stage : `Etapa ${stage}`;
         const justificacionFinal = (reason || '').trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
 
+        // Los parámetros del ciclo de esterilización (método/temperatura/presión/
+        // tiempo) solo llegan cuando el frontend los manda -- es decir, cuando la
+        // etapa que se está registrando es "Esterilización". Para cualquier otra
+        // etapa quedan en null.
         const query = `
             INSERT INTO HISTORIAL_MOVIMIENTO
-            (inventario_id, caja_fisica_id, estado_nuevo, fecha_cambio, area_destino_id, justificacion)
-            VALUES ($1, $2, $3, NOW(), $4, $5)
+            (inventario_id, caja_fisica_id, estado_nuevo, fecha_cambio, area_destino_id, justificacion,
+             metodo_esterilizacion, temperatura, presion, tiempo_minutos)
+            VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7, $8, $9)
         `;
 
-        const values = [inventario_id, caja_fisica_id, estadoFormateado, area_destino_id, justificacionFinal];
+        const values = [
+            inventario_id, caja_fisica_id, estadoFormateado, area_destino_id, justificacionFinal,
+            metodo || null,
+            temperatura !== undefined && temperatura !== '' ? temperatura : null,
+            presion || null,
+            tiempoMinutos !== undefined && tiempoMinutos !== '' ? tiempoMinutos : null
+        ];
 
         await db.query(query, values);
 

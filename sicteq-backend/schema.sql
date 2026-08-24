@@ -12,6 +12,11 @@
 -- física individual que circula (codigo_caja tipo CAJA-0045) -- son
 -- conceptos distintos: un mismo tipo puede tener varias cajas físicas
 -- en circulación al mismo tiempo, cada una en una etapa distinta.
+--
+-- 2026-08-24 (2): se agregan metodo_esterilizacion/temperatura/presion/
+-- tiempo_minutos a historial_movimiento -- se completan solo al pasar por
+-- la etapa de Esterilización, para cumplir el requerimiento formal de
+-- registrar los parámetros del ciclo, no solo el nombre de la etapa.
 -- ==========================================
 
 -- 1. TABLAS MAESTRAS (Sin dependencias)
@@ -97,7 +102,11 @@ CREATE TABLE historial_movimiento (
     justificacion VARCHAR(255),
     solicitud_id INTEGER REFERENCES solicitud(id),
     area_destino_id INTEGER REFERENCES area(id),
-    caja_fisica_id INTEGER REFERENCES caja_fisica(id)
+    caja_fisica_id INTEGER REFERENCES caja_fisica(id),
+    metodo_esterilizacion VARCHAR(50),
+    temperatura NUMERIC(5,1),
+    presion VARCHAR(20),
+    tiempo_minutos INTEGER
 );
 
 -- 7. CICLO DE ESTERILIZACIÓN (Depende de Usuario)

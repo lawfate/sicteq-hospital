@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import Modal from './Modal';
 
-// Deriva el número de etapa (1-5) desde el texto de estado_nuevo, ej. "Etapa 3".
+// Deriva el número de etapa desde el texto de estado_nuevo, ej. "Etapa 3".
 // area_destino_id NO sirve para esto: esa columna referencia el pabellón/área
 // física de destino (tabla AREA), un concepto distinto de la etapa del ciclo.
 const parseStage = (estadoNuevo) => {
   const match = String(estadoNuevo || '').match(/Etapa\s*(\d+)/i);
   return match ? parseInt(match[1], 10) : 1;
 };
+
+// Orden según el requerimiento formal: recepción, lavado, preparación,
+// esterilización, almacenamiento, entrega. Antes solo había 5 etapas y faltaba
+// "Almacenamiento" como paso propio entre esterilizar y entregar.
+const ESTERILIZACION_STAGE_ID = 4;
+
+const METODOS_ESTERILIZACION = ["Autoclave", "Óxido de Etileno", "Plasma de Peróxido de Hidrógeno"];
 
 export default function Ciclo() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,13 +23,18 @@ export default function Ciclo() {
   const [logs, setLogs] = useState([]);
   const [targetStage, setTargetStage] = useState(1);
   const [rollbackReason, setRollbackReason] = useState("");
+  const [metodo, setMetodo] = useState(METODOS_ESTERILIZACION[0]);
+  const [temperatura, setTemperatura] = useState("");
+  const [presion, setPresion] = useState("");
+  const [tiempoMinutos, setTiempoMinutos] = useState("");
 
   const steps = [
     { id: 1, name: "Recepción", icon: "fa-check" },
     { id: 2, name: "Lavado", icon: "fa-soap" },
     { id: 3, name: "Preparación", icon: "fa-wrench" },
-    { id: 4, name: "Autoclave", icon: "fa-circle-radiation" },
-    { id: 5, name: "Entrega", icon: "fa-truck-ramp-box" }
+    { id: 4, name: "Esterilización", icon: "fa-circle-radiation" },
+    { id: 5, name: "Almacenamiento", icon: "fa-warehouse" },
+    { id: 6, name: "Entrega", icon: "fa-truck-ramp-box" }
   ];
 
   // Definimos la URL base usando la variable de entorno de Vite o el fallback local
@@ -80,19 +92,32 @@ export default function Ciclo() {
       // Usamos la caja ya cargada (activeBox), no el input de busqueda en vivo:
       // si el usuario edita o borra el campo despues de buscar pero antes de
       // confirmar, searchText ya no coincide con la caja que esta en pantalla.
+      const body = {
+        codigo: activeBox.codigo,
+        stage: targetStage,
+        reason: rollbackReason
+      };
+
+      // Los parámetros del ciclo solo se registran cuando la etapa es Esterilización.
+      if (targetStage === ESTERILIZACION_STAGE_ID) {
+        body.metodo = metodo;
+        body.temperatura = temperatura;
+        body.presion = presion;
+        body.tiempoMinutos = tiempoMinutos;
+      }
+
       const response = await fetch(`${API_URL}/api/trazabilidad/actualizar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            codigo: activeBox.codigo,
-            stage: targetStage,
-            reason: rollbackReason
-        })
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) throw new Error("Error al actualizar estado");
 
       setRollbackReason("");
+      setTemperatura("");
+      setPresion("");
+      setTiempoMinutos("");
       setIsModalOpen(false);
       alert("Etapa actualizada con éxito");
 
@@ -147,7 +172,7 @@ export default function Ciclo() {
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${activeBox.stage >= step.id ? 'bg-sky-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
                                 <i className={`fa-solid ${step.icon}`}></i>
                             </div>
-                            <span className="text-[10px] font-bold mt-2 text-slate-500 uppercase">{step.name}</span>
+                            <span className="text-[9px] font-bold mt-2 text-slate-500 uppercase text-center">{step.name}</span>
                         </div>
                     ))}
                 </div>
@@ -157,6 +182,14 @@ export default function Ciclo() {
                     {logs.map((log, idx) => (
                         <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                             <p className="font-bold text-slate-800">{log.estado_nuevo || log.event || "Actualización de estado"}</p>
+                            {log.metodo_esterilizacion && (
+                                <p className="text-sky-700 font-mono text-[11px] mt-1">
+                                    {log.metodo_esterilizacion}
+                                    {log.temperatura ? ` · ${log.temperatura}°C` : ''}
+                                    {log.presion ? ` · ${log.presion}` : ''}
+                                    {log.tiempo_minutos ? ` · ${log.tiempo_minutos} min` : ''}
+                                </p>
+                            )}
                             {log.justificacion && log.justificacion !== `Avance a ${log.estado_nuevo}` && (
                                 <p className="text-red-600 italic">Motivo/Comentario: {log.justificacion}</p>
                             )}
@@ -174,6 +207,31 @@ export default function Ciclo() {
         content={{ title: "Confirmar Acción", items: logs }}
       >
           <div className="space-y-4">
+              {targetStage === ESTERILIZACION_STAGE_ID && (
+                  <div className="bg-sky-50 p-3 rounded-lg border border-sky-200 space-y-3">
+                      <p className="text-xs font-bold text-sky-800 uppercase">Parámetros del ciclo de esterilización</p>
+                      <div className="flex flex-col gap-1">
+                          <label className="text-[11px] font-bold text-slate-500 uppercase">Método</label>
+                          <select value={metodo} onChange={(e) => setMetodo(e.target.value)} className="w-full p-2 rounded text-sm border border-slate-300 bg-white">
+                              {METODOS_ESTERILIZACION.map(m => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                          <div className="flex flex-col gap-1">
+                              <label className="text-[11px] font-bold text-slate-500 uppercase">Temp. (°C)</label>
+                              <input type="number" step="0.1" className="w-full p-2 rounded text-sm border border-slate-300" value={temperatura} onChange={(e) => setTemperatura(e.target.value)} placeholder="134" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                              <label className="text-[11px] font-bold text-slate-500 uppercase">Presión</label>
+                              <input type="text" className="w-full p-2 rounded text-sm border border-slate-300" value={presion} onChange={(e) => setPresion(e.target.value)} placeholder="2.1 bar" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                              <label className="text-[11px] font-bold text-slate-500 uppercase">Tiempo (min)</label>
+                              <input type="number" className="w-full p-2 rounded text-sm border border-slate-300" value={tiempoMinutos} onChange={(e) => setTiempoMinutos(e.target.value)} placeholder="20" />
+                          </div>
+                      </div>
+                  </div>
+              )}
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <label className="text-xs font-bold text-slate-700 block mb-2">
                       {targetStage < activeBox?.stage ? "Motivo de Retroceso (Obligatorio)" : "Comentario Adicional (Opcional)"}
