@@ -36,9 +36,13 @@ const buscarCaja = async (req, res) => {
     }
 };
 
+// Etapa "Almacenamiento" del ciclo (ver steps en Ciclo.jsx) -- es el punto
+// donde arranca a correr la vigencia del empaque estéril.
+const ALMACENAMIENTO_STAGE_ID = 5;
+
 const actualizarEtapa = async (req, res) => {
     const codigo = String(req.body.codigo || '').trim().toUpperCase();
-    const { stage, reason, metodo, temperatura, presion, tiempoMinutos } = req.body;
+    const { stage, reason, metodo, temperatura, presion, tiempoMinutos, vigenciaDias } = req.body;
 
     // Validación de campos requeridos. El motivo (reason) es opcional al avanzar
     // de etapa -- el frontend solo lo exige para retrocesos; si viene vacío se usa
@@ -92,6 +96,17 @@ const actualizarEtapa = async (req, res) => {
         ];
 
         await db.query(query, values);
+
+        // Al pasar por Almacenamiento, calculamos y guardamos la fecha de
+        // caducidad del empaque (hoy + vigencia en días) para poder alertar
+        // sobre rotación de stock. Vigencia por defecto: 30 días.
+        if (Number(stage) === ALMACENAMIENTO_STAGE_ID) {
+            const dias = Number(vigenciaDias) > 0 ? Number(vigenciaDias) : 30;
+            await db.query(
+                `UPDATE caja_fisica SET fecha_caducidad = NOW() + ($1 || ' days')::INTERVAL WHERE id = $2`,
+                [dias, caja_fisica_id]
+            );
+        }
 
         res.json({ success: true, message: "Etapa actualizada correctamente" });
     } catch (err) {

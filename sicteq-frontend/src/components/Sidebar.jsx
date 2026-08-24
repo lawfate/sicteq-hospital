@@ -58,6 +58,9 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
                 <Link to="/inventario" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/inventario')}`}>
                     <i className="fa-solid fa-boxes-stacked text-lg w-5"></i> Inventario y Mermas
                 </Link>
+                <Link to="/reportes" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/reportes')}`}>
+                    <i className="fa-solid fa-file-lines text-lg w-5"></i> Reportes de Gestión
+                </Link>
             </nav>
         </div>
         

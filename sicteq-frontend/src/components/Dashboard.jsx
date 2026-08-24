@@ -15,6 +15,7 @@ export default function Dashboard() {
   });
   const [cajasCirculacion, setCajasCirculacion] = useState([]);
   const [showCajasCirculacion, setShowCajasCirculacion] = useState(false);
+  const [alertas, setAlertas] = useState({ stockBajo: [], cajasPorVencer: [] });
 
   useEffect(() => {
     fetch(`${API_URL}/api/dashboard`)
@@ -26,6 +27,14 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(json => setCajasCirculacion(Array.isArray(json) ? json : []))
       .catch(err => console.error("Error cargando cajas en circulación:", err));
+
+    fetch(`${API_URL}/api/alertas`)
+      .then(res => res.json())
+      .then(json => setAlertas({
+        stockBajo: Array.isArray(json.stockBajo) ? json.stockBajo : [],
+        cajasPorVencer: Array.isArray(json.cajasPorVencer) ? json.cajasPorVencer : []
+      }))
+      .catch(err => console.error("Error cargando alertas:", err));
   }, []);
 
   const abrirDetalles = async (mov) => {
@@ -88,6 +97,56 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* ALERTAS PROACTIVAS: antes había que entrar a Inventario a mirar */}
+      {(alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0) ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-amber-100 bg-amber-50 flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation text-amber-600"></i>
+              <h3 className="font-bold text-slate-800 text-sm">Stock bajo o en alerta <span className="text-slate-400 font-normal">({alertas.stockBajo.length})</span></h3>
+            </div>
+            <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+              {alertas.stockBajo.map(item => (
+                <div key={item.id} className="px-5 py-3 flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-semibold text-slate-700">{item.nombre_equipo}</p>
+                    <p className="text-xs text-slate-400 font-mono">{item.codigo_barra || '—'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-slate-700">{item.cantidad_disponible} / {item.cantidad_total ?? '—'}</p>
+                    <span className="text-xs font-semibold text-amber-700">{item.estado_actual || 'Bajo crítico'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-rose-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-rose-100 bg-rose-50 flex items-center gap-2">
+              <i className="fa-solid fa-hourglass-end text-rose-600"></i>
+              <h3 className="font-bold text-slate-800 text-sm">Empaque por vencer <span className="text-slate-400 font-normal">({alertas.cajasPorVencer.length})</span></h3>
+            </div>
+            <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+              {alertas.cajasPorVencer.map(caja => (
+                <div key={caja.id} className="px-5 py-3 flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-semibold text-slate-700 font-mono">{caja.codigo_caja}</p>
+                    <p className="text-xs text-slate-400">{caja.nombre_equipo}</p>
+                  </div>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${caja.dias_restantes < 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {caja.dias_restantes < 0 ? `Vencida hace ${Math.abs(caja.dias_restantes)}d` : `Vence en ${caja.dias_restantes}d`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3 flex items-center gap-3 text-sm text-emerald-700">
+          <i className="fa-solid fa-circle-check"></i>
+          Sin alertas de stock ni de vencimiento de empaque en este momento.
+        </div>
+      )}
 
       {/* SOLICITUDES CRÍTICAS (Actualizado con botón de vincular) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-6 overflow-hidden">

@@ -8,6 +8,7 @@ import Solicitudes from './components/Solicitudes'
 import Ciclo from './components/Ciclo'
 import Vinculo from './components/Vinculo'
 import Inventario from './components/Inventario'
+import Reportes from './components/Reportes'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -40,6 +41,7 @@ function App() {
                 {/* Importante: Pasamos el user a Vinculo para que el control de acceso funcione */}
                 <Route path="/vinculo" element={<Vinculo user={user} />} />
                 <Route path="/inventario" element={<Inventario />} />
+                <Route path="/reportes" element={<Reportes />} />
               </Routes>
           </main>
         </div>

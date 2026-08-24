@@ -24,6 +24,11 @@
 -- la trazabilidad BIDIRECCIONAL real que pide el requerimiento: desde
 -- una caja física se puede ver a qué paciente(s) se usó, y desde un
 -- paciente se puede ver qué cajas se le vincularon.
+--
+-- 2026-08-24 (4): se agrega caja_fisica.fecha_caducidad -- se calcula al
+-- pasar una caja por la etapa de Almacenamiento (hoy + vigencia en días),
+-- para poder alertar sobre rotación de stock por vencimiento de empaque,
+-- algo que antes no se registraba en ningún lado.
 -- ==========================================
 
 -- 1. TABLAS MAESTRAS (Sin dependencias)
@@ -95,7 +100,8 @@ CREATE TABLE caja_fisica (
     codigo_caja VARCHAR(50) UNIQUE NOT NULL,
     estado VARCHAR(30) NOT NULL DEFAULT 'En circulación',
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_eliminacion TIMESTAMP
+    fecha_eliminacion TIMESTAMP,
+    fecha_caducidad TIMESTAMP
 );
 
 -- 6. HISTORIAL DE MOVIMIENTO (Depende de Inventario, Usuario, Solicitud, Area y Caja Física)

@@ -35,6 +35,8 @@ export default function Ciclo() {
   const [temperatura, setTemperatura] = useState("");
   const [presion, setPresion] = useState("");
   const [tiempoMinutos, setTiempoMinutos] = useState("");
+  const [vigenciaDias, setVigenciaDias] = useState("30");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const steps = [
     { id: 1, name: "Recepción", icon: "fa-check" },
@@ -102,6 +104,11 @@ export default function Ciclo() {
   const requiereJustificarSinParametros = !esRetroceso && requiereProbarEsterilizacion(targetStage) && !paramsCompletados;
 
   const executeAction = async () => {
+    // Evita el doble-submit: sin esto, un doble click o un re-render mientras
+    // la petición está en vuelo duplica el movimiento (pasó en producción con
+    // CAJA-0005, dos "Etapa 4" idénticas insertadas 365ms aparte).
+    if (isSubmitting) return;
+
     if (esRetroceso && !rollbackReason.trim()) {
       alert("ERROR: Debe ingresar el motivo técnico del retroceso.");
       return;
@@ -112,6 +119,7 @@ export default function Ciclo() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // Usamos la caja ya cargada (activeBox), no el input de busqueda en vivo:
       // si el usuario edita o borra el campo despues de buscar pero antes de
@@ -131,6 +139,12 @@ export default function Ciclo() {
         body.tiempoMinutos = tiempoMinutos;
       }
 
+      // La vigencia del empaque solo aplica al entrar a Almacenamiento: es
+      // el punto donde arranca a correr el reloj de caducidad.
+      if (targetStage === 5) {
+        body.vigenciaDias = vigenciaDias;
+      }
+
       const response = await fetch(`${API_URL}/api/trazabilidad/actualizar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,6 +157,7 @@ export default function Ciclo() {
       setTemperatura("");
       setPresion("");
       setTiempoMinutos("");
+      setVigenciaDias("30");
       setIsModalOpen(false);
       alert("Etapa actualizada con éxito");
 
@@ -150,6 +165,8 @@ export default function Ciclo() {
 
     } catch (err) {
       alert("No se pudo procesar la acción: " + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -268,6 +285,13 @@ export default function Ciclo() {
                               <input type="number" className="w-full p-2 rounded text-sm border border-slate-300" value={tiempoMinutos} onChange={(e) => setTiempoMinutos(e.target.value)} placeholder="20" />
                           </div>
                       </div>
+                      {targetStage === 5 && (
+                          <div className="flex flex-col gap-1 pt-1 border-t border-sky-100">
+                              <label className="text-[11px] font-bold text-slate-500 uppercase">Vigencia del empaque (días)</label>
+                              <input type="number" min="1" className="w-32 p-2 rounded text-sm border border-slate-300" value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} placeholder="30" />
+                              <p className="text-[11px] text-sky-700">Desde hoy se calcula la fecha de caducidad del empaque estéril.</p>
+                          </div>
+                      )}
                   </div>
               )}
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
@@ -285,8 +309,8 @@ export default function Ciclo() {
                       placeholder="Escriba aquí..."
                   ></textarea>
               </div>
-            <button onClick={executeAction} className="w-full bg-sky-600 text-white py-2 rounded-lg font-bold text-sm">
-                Confirmar
+            <button onClick={executeAction} disabled={isSubmitting} className="w-full bg-sky-600 text-white py-2 rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                {isSubmitting ? "Guardando..." : "Confirmar"}
             </button>
           </div>
       </Modal>

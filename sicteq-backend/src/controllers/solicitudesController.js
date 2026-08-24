@@ -1,5 +1,37 @@
 const db = require('../config/db');
 
+const nullable = (v) => (v === undefined || v === '' ? null : v);
+
+// GET: Listado completo de solicitudes, filtrable por área/estado/fecha. No
+// existía ningún endpoint para esto -- la única vista era el bloque
+// "críticas" del dashboard (solo pendientes, máximo 5).
+const getSolicitudes = async (req, res) => {
+    const areaId = nullable(req.query.area_id);
+    const estado = nullable(req.query.estado);
+    const desde = nullable(req.query.desde);
+    const hasta = nullable(req.query.hasta);
+
+    try {
+        const result = await db.query(`
+            SELECT s.id, s.fecha_creacion, s.estado, s.tipo_cirugia, s.observaciones,
+                   a.nombre AS area_nombre, u.nombre AS usuario_nombre
+            FROM solicitud s
+            LEFT JOIN area a ON s.area_id = a.id
+            LEFT JOIN usuario u ON s.usuario_id = u.id
+            WHERE ($1::int IS NULL OR s.area_id = $1)
+              AND ($2::text IS NULL OR s.estado = $2)
+              AND ($3::timestamp IS NULL OR s.fecha_creacion >= $3)
+              AND ($4::timestamp IS NULL OR s.fecha_creacion <= $4)
+            ORDER BY s.fecha_creacion DESC
+        `, [areaId, estado, desde, hasta]);
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Error al listar solicitudes:", error);
+        res.status(500).json({ error: 'Error al listar solicitudes' });
+    }
+};
+
 // GET: Obtener la lista de pabellones
 const getAreas = async (req, res) => {
     try {
@@ -55,6 +87,14 @@ const despacharSolicitud = async (req, res) => {
 
         const { id: caja_fisica_id, inventario_id } = cajaResult.rows[0];
 
+        // 2b. Descontamos el stock disponible del tipo de caja despachado.
+        // Antes esto nunca se tocaba: el inventario mostrado no reflejaba
+        // los despachos reales, sin importar cuántos hubiera.
+        await db.query(
+            "UPDATE inventario SET cantidad_disponible = GREATEST(cantidad_disponible - 1, 0) WHERE id = $1",
+            [inventario_id]
+        );
+
         // 3. Actualizamos el estado de la solicitud
         const result = await db.query(
             "UPDATE solicitud SET estado = 'Despachado' WHERE id = $1 RETURNING id",
@@ -89,4 +129,4 @@ const despacharSolicitud = async (req, res) => {
     }
 };
 
-module.exports = { getAreas, crearSolicitud, despacharSolicitud };
+module.exports = { getSolicitudes, getAreas, crearSolicitud, despacharSolicitud };
