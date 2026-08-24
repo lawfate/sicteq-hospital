@@ -30,22 +30,24 @@ export default function Ciclo() {
 
   const handleSearch = async () => {
     try {
-      const id = searchText.replace('#FOL-', '');
-      const response = await fetch(`${API_URL}/api/trazabilidad/buscar/${id}`);
-      
+      const codigo = searchText.trim().toUpperCase();
+      if (!codigo) return;
+
+      const response = await fetch(`${API_URL}/api/trazabilidad/buscar/${encodeURIComponent(codigo)}`);
+
       // 1. Si el backend responde con error (404, 500, etc), extraemos el mensaje real
       if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || errorData.message || `Error del servidor: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       // 2. Validamos que el backend realmente envió un historial y no un array vacío
       if (!data || data.length === 0) {
-          throw new Error("El folio no tiene un historial válido asociado (array vacío).");
+          throw new Error("Esta caja todavía no tiene ningún movimiento registrado.");
       }
-      
+
       const ultimoRegistro = data[0];
 
       // 3. Validamos que el registro tenga la estructura esperada
@@ -56,7 +58,7 @@ export default function Ciclo() {
       const stageActual = parseStage(ultimoRegistro?.estado_nuevo);
 
       setActiveBox({
-          folio: searchText,
+          codigo,
           stage: stageActual
       });
       setTargetStage(stageActual);
@@ -64,7 +66,7 @@ export default function Ciclo() {
       setLogs(data);
     } catch (err) {
       console.error(">>> ERROR DETALLADO:", err);
-      alert("Problema al buscar: " + err.message); 
+      alert("Problema al buscar: " + err.message);
     }
   };
 
@@ -75,15 +77,14 @@ export default function Ciclo() {
     }
 
     try {
-      // Usamos el folio ya cargado (activeBox), no el input de busqueda en vivo:
+      // Usamos la caja ya cargada (activeBox), no el input de busqueda en vivo:
       // si el usuario edita o borra el campo despues de buscar pero antes de
-      // confirmar, searchText ya no coincide con el folio que esta en pantalla.
-      const id = activeBox.folio.replace('#FOL-', '');
+      // confirmar, searchText ya no coincide con la caja que esta en pantalla.
       const response = await fetch(`${API_URL}/api/trazabilidad/actualizar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            id: id, 
+        body: JSON.stringify({
+            codigo: activeBox.codigo,
             stage: targetStage,
             reason: rollbackReason
         })
@@ -94,9 +95,9 @@ export default function Ciclo() {
       setRollbackReason("");
       setIsModalOpen(false);
       alert("Etapa actualizada con éxito");
-      
+
       handleSearch();
-      
+
     } catch (err) {
       alert("No se pudo procesar la acción: " + err.message);
     }
@@ -106,22 +107,23 @@ export default function Ciclo() {
     <section className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Ciclo de Trazabilidad</h2>
-        <p className="text-slate-500 text-sm">Escanee el folio para auditar o avanzar la línea de tiempo.</p>
+        <p className="text-slate-500 text-sm">Escanee el código de la caja para auditar o avanzar la línea de tiempo.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 h-fit">
             <h3 className="font-bold text-slate-800 text-sm">Entrada de Acción</h3>
             <div className="space-y-3">
-                <input 
-                  type="text" 
-                  value={searchText} 
-                  onChange={(e) => setSearchText(e.target.value)} 
-                  placeholder="#FOL-..." 
-                  className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50" 
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="Ej: GEN-001"
+                  className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50 uppercase tracking-wider"
                 />
                 <button onClick={handleSearch} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm hover:bg-slate-800">Buscar</button>
-                
+
                 {activeBox && (
                     <select value={targetStage} onChange={(e) => setTargetStage(parseInt(e.target.value))} className="w-full p-2 border border-sky-300 rounded-lg text-sm bg-sky-50 font-bold text-sky-700">
                         {steps.map(s => <option key={s.id} value={s.id}>{s.id}. {s.name}</option>)}
@@ -137,7 +139,7 @@ export default function Ciclo() {
 
         {activeBox && (
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm md:col-span-2 space-y-6">
-                <h3 className="font-bold text-slate-800">Línea de Tiempo: {activeBox.folio}</h3>
+                <h3 className="font-bold text-slate-800">Línea de Tiempo: <span className="font-mono text-sky-700">{activeBox.codigo}</span></h3>
                 <div className="flex justify-between relative px-2 mb-4">
                     <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-200 -z-0"></div>
                     {steps.map((step) => (
@@ -149,13 +151,13 @@ export default function Ciclo() {
                         </div>
                     ))}
                 </div>
-                
+
                 <div className="space-y-3">
                     <h4 className="text-xs font-bold text-slate-400 uppercase">Bitácora</h4>
                     {logs.map((log, idx) => (
                         <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                             <p className="font-bold text-slate-800">{log.estado_nuevo || log.event || "Actualización de estado"}</p>
-                            {log.justificacion && log.justificacion !== `Avance a Etapa ${log.area_destino_id}` && (
+                            {log.justificacion && log.justificacion !== `Avance a ${log.estado_nuevo}` && (
                                 <p className="text-red-600 italic">Motivo/Comentario: {log.justificacion}</p>
                             )}
                             <p className="text-slate-500">{log.fecha_cambio ? new Date(log.fecha_cambio).toLocaleString() : log.time}</p>
@@ -166,9 +168,9 @@ export default function Ciclo() {
         )}
       </div>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         content={{ title: "Confirmar Acción", items: logs }}
       >
           <div className="space-y-4">
@@ -176,9 +178,9 @@ export default function Ciclo() {
                   <label className="text-xs font-bold text-slate-700 block mb-2">
                       {targetStage < activeBox?.stage ? "Motivo de Retroceso (Obligatorio)" : "Comentario Adicional (Opcional)"}
                   </label>
-                  <textarea 
-                      className="w-full p-2 rounded text-sm border border-slate-300" 
-                      value={rollbackReason} 
+                  <textarea
+                      className="w-full p-2 rounded text-sm border border-slate-300"
+                      value={rollbackReason}
                       onChange={(e) => setRollbackReason(e.target.value)}
                       placeholder="Escriba aquí..."
                   ></textarea>
