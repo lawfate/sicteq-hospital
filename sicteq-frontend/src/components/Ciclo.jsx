@@ -119,7 +119,7 @@ export default function Ciclo() {
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value.toUpperCase())}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="Ej: GEN-001"
+                  placeholder="Ej: CAJA-0045"
                   className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50 uppercase tracking-wider"
                 />
                 <button onClick={handleSearch} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm hover:bg-slate-800">Buscar</button>

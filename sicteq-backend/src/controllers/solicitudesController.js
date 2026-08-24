@@ -40,19 +40,20 @@ const despacharSolicitud = async (req, res) => {
         // 1. Iniciamos transacción
         await db.query('BEGIN');
 
-        // 2. Buscamos la caja por su código de barras real (antes se comparaba
-        // por error contra nombre_equipo, así que casi ningún despacho matcheaba)
-        const invResult = await db.query(
-            "SELECT id FROM INVENTARIO WHERE codigo_barra = $1 LIMIT 1",
+        // 2. Buscamos la caja FÍSICA individual por su código (ej. CAJA-0045),
+        // no el tipo/categoría (inventario.codigo_barra, ej. GEN-001). El TENS
+        // despacha una unidad física concreta, no "un tipo de caja".
+        const cajaResult = await db.query(
+            "SELECT id, inventario_id FROM CAJA_FISICA WHERE codigo_caja = $1 LIMIT 1",
             [caja_codigo]
         );
 
-        if (invResult.rows.length === 0) {
+        if (cajaResult.rows.length === 0) {
             await db.query('ROLLBACK');
             return res.status(404).json({ error: `No se encontró ninguna caja con el código "${caja_codigo}"` });
         }
 
-        const inventario_id = invResult.rows[0].id;
+        const { id: caja_fisica_id, inventario_id } = cajaResult.rows[0];
 
         // 3. Actualizamos el estado de la solicitud
         const result = await db.query(
@@ -67,15 +68,16 @@ const despacharSolicitud = async (req, res) => {
 
         // 4. Registramos el movimiento en el historial
         await db.query(
-            `INSERT INTO HISTORIAL_MOVIMIENTO (inventario_id, area_destino_id, estado_nuevo, justificacion, fecha_cambio)
+            `INSERT INTO HISTORIAL_MOVIMIENTO (inventario_id, caja_fisica_id, area_destino_id, estado_nuevo, justificacion, fecha_cambio)
              VALUES (
                 $1,
-                (SELECT area_id FROM SOLICITUD WHERE id = $2),
+                $2,
+                (SELECT area_id FROM SOLICITUD WHERE id = $3),
                 'Despachado',
-                $3,
+                $4,
                 NOW()
              )`,
-            [inventario_id, id, `Despacho de caja ${caja_codigo} para solicitud REQ-${id}`]
+            [inventario_id, caja_fisica_id, id, `Despacho de caja ${caja_codigo} para solicitud REQ-${id}`]
         );
 
         await db.query('COMMIT');

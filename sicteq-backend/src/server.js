@@ -10,6 +10,7 @@ const trazabilidadRoutes = require('./routes/trazabilidadRoutes');
 const authRoutes = require('./routes/authRoutes');
 const solicitudesRoutes = require('./routes/solicitudesRoutes');
 const inventarioRoutes = require('./routes/inventarioRoutes');
+const cajaFisicaRoutes = require('./routes/cajaFisicaRoutes');
 
 // Middlewares
 // Configuración de CORS permisiva para depuración
@@ -28,6 +29,7 @@ app.use('/api/trazabilidad', trazabilidadRoutes);
 app.use('/api/auth', authRoutes); 
 app.use('/api/solicitudes', solicitudesRoutes);
 app.use('/api/inventario', inventarioRoutes);
+app.use('/api/cajas', cajaFisicaRoutes);
 
 // Ruta de Salud para probar que el servidor responde
 app.get('/api/health', (req, res) => {

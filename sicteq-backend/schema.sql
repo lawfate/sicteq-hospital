@@ -5,6 +5,13 @@
 -- el 2026-08-23. Esta es la ÚNICA fuente de verdad del esquema:
 -- reemplaza a databse/init.sql y a BD HOSPITAL.sql (ambos
 -- desactualizados respecto a lo que corre en producción).
+--
+-- 2026-08-24: se agregó caja_fisica + historial_movimiento.caja_fisica_id.
+-- INVENTARIO representa el TIPO de caja (categoría, ej. "Cirugía Menor",
+-- con su codigo_barra tipo GEN-001). CAJA_FISICA representa cada unidad
+-- física individual que circula (codigo_caja tipo CAJA-0045) -- son
+-- conceptos distintos: un mismo tipo puede tener varias cajas físicas
+-- en circulación al mismo tiempo, cada una en una etapa distinta.
 -- ==========================================
 
 -- 1. TABLAS MAESTRAS (Sin dependencias)
@@ -68,7 +75,18 @@ CREATE TABLE detalle_solicitud (
     cantidad_solicitada INTEGER
 );
 
--- 6. HISTORIAL DE MOVIMIENTO (Depende de Inventario, Usuario, Solicitud y Area)
+-- 5b. CAJA FÍSICA (Depende de Inventario) -- unidad física individual,
+-- distinta del tipo/categoría que representa INVENTARIO
+CREATE TABLE caja_fisica (
+    id SERIAL PRIMARY KEY,
+    inventario_id INTEGER REFERENCES inventario(id),
+    codigo_caja VARCHAR(50) UNIQUE NOT NULL,
+    estado VARCHAR(30) NOT NULL DEFAULT 'En circulación',
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_eliminacion TIMESTAMP
+);
+
+-- 6. HISTORIAL DE MOVIMIENTO (Depende de Inventario, Usuario, Solicitud, Area y Caja Física)
 CREATE TABLE historial_movimiento (
     id SERIAL PRIMARY KEY,
     inventario_id INTEGER REFERENCES inventario(id),
@@ -78,7 +96,8 @@ CREATE TABLE historial_movimiento (
     fecha_cambio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     justificacion VARCHAR(255),
     solicitud_id INTEGER REFERENCES solicitud(id),
-    area_destino_id INTEGER REFERENCES area(id)
+    area_destino_id INTEGER REFERENCES area(id),
+    caja_fisica_id INTEGER REFERENCES caja_fisica(id)
 );
 
 -- 7. CICLO DE ESTERILIZACIÓN (Depende de Usuario)
