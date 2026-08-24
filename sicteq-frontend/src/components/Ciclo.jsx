@@ -12,7 +12,14 @@ const parseStage = (estadoNuevo) => {
 // Orden según el requerimiento formal: recepción, lavado, preparación,
 // esterilización, almacenamiento, entrega. Antes solo había 5 etapas y faltaba
 // "Almacenamiento" como paso propio entre esterilizar y entregar.
-const ESTERILIZACION_STAGE_ID = 4;
+//
+// Los parámetros del ciclo (temperatura/presión/tiempo alcanzados) se piden
+// recién al PASAR a Almacenamiento o Entrega, no al entrar a Esterilización:
+// son el resultado real del ciclo, que solo se conoce cuando termina. Si no
+// se completan (p. ej. porque se salta directo de un paso anterior sin pasar
+// por Esterilización), hay que dejar un comentario obligatorio que lo
+// justifique -- igual que un retroceso.
+const requiereProbarEsterilizacion = (stage) => stage === 5 || stage === 6;
 
 const METODOS_ESTERILIZACION = ["Autoclave", "Óxido de Etileno", "Plasma de Peróxido de Hidrógeno"];
 
@@ -90,9 +97,18 @@ export default function Ciclo() {
     }
   };
 
+  const paramsCompletados = temperatura.trim() !== '' || presion.trim() !== '' || tiempoMinutos.trim() !== '';
+  const esRetroceso = activeBox && targetStage < activeBox.stage;
+  const requiereJustificarSinParametros = !esRetroceso && requiereProbarEsterilizacion(targetStage) && !paramsCompletados;
+
   const executeAction = async () => {
-    if (targetStage < activeBox.stage && !rollbackReason.trim()) {
+    if (esRetroceso && !rollbackReason.trim()) {
       alert("ERROR: Debe ingresar el motivo técnico del retroceso.");
+      return;
+    }
+
+    if (requiereJustificarSinParametros && !rollbackReason.trim()) {
+      alert("ERROR: Para pasar a esta etapa debe completar los parámetros de esterilización, o dejar un comentario que justifique por qué no los tiene.");
       return;
     }
 
@@ -106,8 +122,9 @@ export default function Ciclo() {
         reason: rollbackReason
       };
 
-      // Los parámetros del ciclo solo se registran cuando la etapa es Esterilización.
-      if (targetStage === ESTERILIZACION_STAGE_ID) {
+      // Los parámetros del ciclo se registran al pasar a Almacenamiento o Entrega
+      // (el resultado real del ciclo, no al entrar a Esterilización).
+      if (requiereProbarEsterilizacion(targetStage) && paramsCompletados) {
         body.metodo = metodo;
         body.temperatura = temperatura;
         body.presion = presion;
@@ -227,9 +244,10 @@ export default function Ciclo() {
         content={{ title: "Confirmar Acción", items: logs }}
       >
           <div className="space-y-4">
-              {targetStage === ESTERILIZACION_STAGE_ID && (
+              {requiereProbarEsterilizacion(targetStage) && (
                   <div className="bg-sky-50 p-3 rounded-lg border border-sky-200 space-y-3">
                       <p className="text-xs font-bold text-sky-800 uppercase">Parámetros del ciclo de esterilización</p>
+                      <p className="text-[11px] text-sky-700 -mt-2">Complete esto o deje un comentario justificando por qué no los tiene.</p>
                       <div className="flex flex-col gap-1">
                           <label className="text-[11px] font-bold text-slate-500 uppercase">Método</label>
                           <select value={metodo} onChange={(e) => setMetodo(e.target.value)} className="w-full p-2 rounded text-sm border border-slate-300 bg-white">
@@ -254,7 +272,11 @@ export default function Ciclo() {
               )}
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <label className="text-xs font-bold text-slate-700 block mb-2">
-                      {targetStage < activeBox?.stage ? "Motivo de Retroceso (Obligatorio)" : "Comentario Adicional (Opcional)"}
+                      {esRetroceso
+                        ? "Motivo de Retroceso (Obligatorio)"
+                        : requiereJustificarSinParametros
+                          ? "Comentario (Obligatorio: faltan los parámetros de esterilización)"
+                          : "Comentario Adicional (Opcional)"}
                   </label>
                   <textarea
                       className="w-full p-2 rounded text-sm border border-slate-300"
