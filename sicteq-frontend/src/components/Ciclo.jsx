@@ -75,7 +75,10 @@ export default function Ciclo() {
     }
 
     try {
-      const id = searchText.replace('#FOL-', '');
+      // Usamos el folio ya cargado (activeBox), no el input de busqueda en vivo:
+      // si el usuario edita o borra el campo despues de buscar pero antes de
+      // confirmar, searchText ya no coincide con el folio que esta en pantalla.
+      const id = activeBox.folio.replace('#FOL-', '');
       const response = await fetch(`${API_URL}/api/trazabilidad/actualizar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
