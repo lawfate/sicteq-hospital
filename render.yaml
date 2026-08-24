@@ -1,0 +1,21 @@
+# Blueprint de Render para el backend de SICTEQ.
+# Uso: en render.com -> New -> Blueprint -> conectar este repo.
+# El plan "free" se duerme tras 15 min sin trafico (cold start ~30-50s
+# en el primer request); aceptable en fase de pruebas.
+#
+# Variables de entorno a completar a mano en el dashboard de Render
+# (no se versionan aca por seguridad):
+#   DATABASE_URL -> connection string de Neon (la misma de sicteq-backend/.env)
+services:
+  - type: web
+    name: sicteq-backend
+    runtime: node
+    plan: free
+    rootDir: sicteq-backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PORT
+        value: 4000

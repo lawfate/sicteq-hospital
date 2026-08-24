@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Modal from './Modal';
+
+// Deriva el número de etapa (1-5) desde el texto de estado_nuevo, ej. "Etapa 3".
+// area_destino_id NO sirve para esto: esa columna referencia el pabellón/área
+// física de destino (tabla AREA), un concepto distinto de la etapa del ciclo.
+const parseStage = (estadoNuevo) => {
+  const match = String(estadoNuevo || '').match(/Etapa\s*(\d+)/i);
+  return match ? parseInt(match[1], 10) : 1;
+};
 
 export default function Ciclo() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,20 +46,22 @@ export default function Ciclo() {
           throw new Error("El folio no tiene un historial válido asociado (array vacío).");
       }
       
-      const ultimoRegistro = data[0]; 
-      
+      const ultimoRegistro = data[0];
+
       // 3. Validamos que el registro tenga la estructura esperada
-      if (!ultimoRegistro || !ultimoRegistro.area_destino_id) {
+      if (!ultimoRegistro || !ultimoRegistro.estado_nuevo) {
           console.warn("Registro devuelto por la BD está incompleto:", ultimoRegistro);
       }
-      
-      setActiveBox({ 
-          folio: searchText, 
-          stage: parseInt(ultimoRegistro?.area_destino_id) || 1 
-      }); 
-      setTargetStage(parseInt(ultimoRegistro?.area_destino_id) || 1);
-      
-      setLogs(data); 
+
+      const stageActual = parseStage(ultimoRegistro?.estado_nuevo);
+
+      setActiveBox({
+          folio: searchText,
+          stage: stageActual
+      });
+      setTargetStage(stageActual);
+
+      setLogs(data);
     } catch (err) {
       console.error(">>> ERROR DETALLADO:", err);
       alert("Problema al buscar: " + err.message); 

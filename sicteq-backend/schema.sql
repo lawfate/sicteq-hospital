@@ -1,6 +1,10 @@
 -- ==========================================
 -- SICTEQ - HOSPITAL REGIONAL DE RANCAGUA
--- Esquema de Base de Datos Real (PostgreSQL)
+-- Esquema real de la base de datos (PostgreSQL / Neon)
+-- Generado por introspección directa de information_schema
+-- el 2026-08-23. Esta es la ÚNICA fuente de verdad del esquema:
+-- reemplaza a databse/init.sql y a BD HOSPITAL.sql (ambos
+-- desactualizados respecto a lo que corre en producción).
 -- ==========================================
 
 -- 1. TABLAS MAESTRAS (Sin dependencias)
@@ -43,12 +47,17 @@ CREATE TABLE inventario (
 );
 
 -- 4. SOLICITUDES (Depende de Usuario y Area)
+-- NOTA: tipo_cirugia y observaciones fueron agregadas directo en Neon
+-- (ALTER TABLE manual) y no estaban documentadas en ningún .sql del repo
+-- hasta esta reconciliación.
 CREATE TABLE solicitud (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER REFERENCES usuario(id),
     area_id INTEGER REFERENCES area(id),
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    estado VARCHAR(50)
+    estado VARCHAR(50),
+    tipo_cirugia VARCHAR(100),
+    observaciones TEXT
 );
 
 -- 5. DETALLE SOLICITUD (Depende de Solicitud e Inventario)

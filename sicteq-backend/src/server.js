@@ -6,7 +6,6 @@ const PORT = process.env.PORT || 4000;
 // Importación de rutas
 const areaRoutes = require('./routes/areaRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
-const metricsRoutes = require('./routes/metricsRoutes');
 const trazabilidadRoutes = require('./routes/trazabilidadRoutes');
 const authRoutes = require('./routes/authRoutes');
 const solicitudesRoutes = require('./routes/solicitudesRoutes');
@@ -23,7 +22,6 @@ app.use(cors({
 app.use(express.json()); // NECESARIO para procesar peticiones JSON
 
 // Rutas
-app.use('/api/metrics', metricsRoutes);
 app.use('/api/areas', areaRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/trazabilidad', trazabilidadRoutes);

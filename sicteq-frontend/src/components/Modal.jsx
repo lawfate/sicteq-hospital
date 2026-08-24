@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function Modal({ isOpen, onClose, content, children }) {
   if (!isOpen) return null;
 

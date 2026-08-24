@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; // <-- NUEVO: Para navegar a la vista de Vínculo
 import Modal from './Modal';
 
@@ -137,6 +137,7 @@ export default function Dashboard() {
               <th className="px-6 py-3">Folio</th>
               <th className="px-6 py-3">Caja / Instrumental</th>
               <th className="px-6 py-3">Destino</th>
+              <th className="px-6 py-3">Fecha</th>
               <th className="px-6 py-3">Estado Actual</th>
               <th className="px-6 py-3 text-center">Acción</th>
             </tr>
@@ -147,6 +148,7 @@ export default function Dashboard() {
                 <td className="px-6 py-4 font-bold text-slate-800">{`#FOL-${String(mov.id).padStart(4, '0')}`}</td>
                 <td className="px-6 py-4">{mov.justificacion}</td>
                 <td className="px-6 py-4">{mov.destino || 'Sin destino'}</td>
+                <td className="px-6 py-4 text-xs text-slate-500">{mov.fecha_cambio ? formatDate(mov.fecha_cambio) : '—'}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                     mov.estado_nuevo === 'Despachado' ? 'bg-emerald-100 text-emerald-700' :
@@ -165,7 +167,7 @@ export default function Dashboard() {
             ))}
             {data.movimientos.length === 0 && (
               <tr>
-                <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
                   No hay movimientos registrados aún.
                 </td>
               </tr>
