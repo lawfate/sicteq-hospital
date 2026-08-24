@@ -2,8 +2,12 @@ const db = require('../config/db');
 
 const buscarFolio = async (req, res) => {
     // Limpiamos el ID para asegurar que solo contenga números
-    const id = parseInt(req.params.id.replace(/\D/g, ''), 10); 
-    
+    const id = parseInt(req.params.id.replace(/\D/g, ''), 10);
+
+    if (!id || isNaN(id)) {
+        return res.status(400).json({ message: "Folio inválido: debe contener un número de folio." });
+    }
+
     try {
         const invResult = await db.query(
             "SELECT inventario_id FROM HISTORIAL_MOVIMIENTO WHERE id = $1 LIMIT 1", 
@@ -48,9 +52,11 @@ const actualizarEtapa = async (req, res) => {
     const id = parseInt(String(req.body.id).replace(/\D/g, ''), 10);
     const { stage, reason } = req.body; 
     
-    // Validación de campos requeridos
-    if (!id || stage === undefined || !reason) {
-        return res.status(400).json({ error: "Datos incompletos: se requiere id, stage y reason." });
+    // Validación de campos requeridos. El motivo (reason) es opcional al avanzar
+    // de etapa -- el frontend solo lo exige para retrocesos; si viene vacío se usa
+    // un texto por defecto (ver justificacionFinal mas abajo).
+    if (!id || stage === undefined) {
+        return res.status(400).json({ error: "Datos incompletos: se requiere id y stage." });
     }
 
     try {
@@ -71,7 +77,7 @@ const actualizarEtapa = async (req, res) => {
 
         // Formatear el estado y la justificación
         const estadoFormateado = typeof stage === 'string' ? stage : `Etapa ${stage}`;
-        const justificacionFinal = reason.trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
+        const justificacionFinal = (reason || '').trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
         
         const query = `
             INSERT INTO HISTORIAL_MOVIMIENTO 

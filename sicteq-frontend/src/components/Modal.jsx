@@ -30,6 +30,9 @@ export default function Modal({ isOpen, onClose, content, children }) {
             ))}
           </div>
         )}
+        {content.items && content.items.length === 0 && content.emptyMessage && (
+          <p className="text-sm text-slate-400 italic mb-6">{content.emptyMessage}</p>
+        )}
 
         {/* Renderizado de children (botón confirmar, textarea, etc.) */}
         {children && (

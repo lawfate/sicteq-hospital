@@ -23,7 +23,15 @@ export default function Dashboard() {
 
   const abrirDetalles = async (mov) => {
     try {
-      if (!mov.inventario_id) return;
+      if (!mov.inventario_id) {
+        setModalContent({
+          title: `Historial: ${mov.justificacion}`,
+          items: [],
+          emptyMessage: 'Este movimiento no tiene una caja de inventario asociada, así que no hay historial adicional que mostrar.'
+        });
+        setIsModalOpen(true);
+        return;
+      }
       const response = await fetch(`${API_URL}/api/dashboard/movimientos/${mov.inventario_id}`);
       const data = await response.json();
       setModalContent({
