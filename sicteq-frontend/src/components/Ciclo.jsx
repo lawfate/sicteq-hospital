@@ -21,6 +21,7 @@ export default function Ciclo() {
   const [searchText, setSearchText] = useState("");
   const [activeBox, setActiveBox] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [pacientesVinculados, setPacientesVinculados] = useState([]);
   const [targetStage, setTargetStage] = useState(1);
   const [rollbackReason, setRollbackReason] = useState("");
   const [metodo, setMetodo] = useState(METODOS_ESTERILIZACION[0]);
@@ -76,6 +77,13 @@ export default function Ciclo() {
       setTargetStage(stageActual);
 
       setLogs(data);
+
+      // Dirección caja -> paciente de la trazabilidad bidireccional: qué
+      // paciente(s) se le vincularon a esta caja física, si los hay.
+      fetch(`${API_URL}/api/cajas/${encodeURIComponent(codigo)}/pacientes`)
+        .then(r => r.ok ? r.json() : [])
+        .then(p => setPacientesVinculados(Array.isArray(p) ? p : []))
+        .catch(() => setPacientesVinculados([]));
     } catch (err) {
       console.error(">>> ERROR DETALLADO:", err);
       alert("Problema al buscar: " + err.message);
@@ -176,6 +184,18 @@ export default function Ciclo() {
                         </div>
                     ))}
                 </div>
+
+                {pacientesVinculados.length > 0 && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
+                        <h4 className="text-xs font-bold text-emerald-700 uppercase flex items-center gap-2"><i className="fa-solid fa-user-injured"></i>Paciente(s) vinculado(s) a esta caja</h4>
+                        {pacientesVinculados.map(p => (
+                            <div key={p.id} className="flex justify-between items-center bg-white p-2 rounded border border-emerald-100 text-xs">
+                                <span className="font-bold text-slate-800">{p.nombre} <span className="text-slate-400 font-mono font-normal">({p.rut})</span></span>
+                                <span className="text-slate-500">{new Date(p.fecha_vinculo).toLocaleDateString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 <div className="space-y-3">
                     <h4 className="text-xs font-bold text-slate-400 uppercase">Bitácora</h4>

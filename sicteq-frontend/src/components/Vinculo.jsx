@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -6,51 +6,95 @@ const API_URL = import.meta.env.VITE_API_URL;
 export default function Vinculo({ user }) {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // Capturamos si viene un ID de solicitud desde el Dashboard
   const queryParams = new URLSearchParams(location.search);
   const solicitudId = queryParams.get('solicitud');
-  
+
   // Si hay solicitud, estamos en modo "Despacho" (TENS). Si no, en modo "Clínico" (Enfermera)
   const isDespachoMode = Boolean(solicitudId);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [pacientes, setPacientes] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [cajaCode, setCajaCode] = useState('');
   const [status, setStatus] = useState({ loading: false, message: '', type: '' });
+  const [vinculoStatus, setVinculoStatus] = useState({ loading: false, message: '', type: '' });
 
-  // Base de datos simulada de pacientes
-  const DB_PACIENTES = [
-    { rut: "20.145.892-3", nombre: "Carlos Henríquez Soto", edad: "42 años", pabellón: "Pabellón 3", diagnostico: "Fractura expuesta de fémur", historial: ["BOX-OK-551 (Set Ortopedia)"] },
-    { rut: "22.658.114-K", nombre: "María Paz Contreras", edad: "28 años", pabellón: "Pabellón 1", diagnostico: "Cesárea programada", historial: ["BOX-AUT-302 (Set Cesárea)"] },
-    { rut: "15.342.789-0", nombre: "Juan Alberto Díaz", edad: "61 años", pabellón: "Pabellón 2", diagnostico: "Colecistectomía", historial: [] }
-  ];
+  // LOGICA DE ROLES MEJORADA:
+  const isAuthorized =
+    user?.role === 'IT' ||
+    (user?.role === 'Enfermera' && !isDespachoMode) ||
+    (user?.role === 'TENS' && isDespachoMode);
+
+  const loadPacientes = () => {
+    fetch(`${API_URL}/api/pacientes`)
+      .then(res => res.json())
+      .then(data => setPacientes(Array.isArray(data) ? data : []))
+      .catch(err => console.error("Error al cargar pacientes:", err));
+  };
+
+  useEffect(() => {
+    if (isAuthorized && !isDespachoMode) {
+      loadPacientes();
+    }
+  }, [isAuthorized, isDespachoMode]);
 
   // Sin texto de búsqueda mostramos todos los pacientes (para poder verlos,
   // no solo encontrarlos escribiendo); con texto, filtramos por RUT o nombre.
   const filteredPatients = searchTerm
-    ? DB_PACIENTES.filter(p => p.rut.includes(searchTerm) || p.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-    : DB_PACIENTES;
+    ? pacientes.filter(p => p.rut.includes(searchTerm) || p.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+    : pacientes;
 
-  // LOGICA DE ROLES MEJORADA: 
-  const isAuthorized = 
-    user?.role === 'IT' || 
-    (user?.role === 'Enfermera' && !isDespachoMode) || 
-    (user?.role === 'TENS' && isDespachoMode);
+  // Trae la ficha completa (con historial real de cajas vinculadas) al seleccionar.
+  const selectPatient = async (rut) => {
+    try {
+      const response = await fetch(`${API_URL}/api/pacientes/${encodeURIComponent(rut)}`);
+      if (!response.ok) throw new Error('No se pudo cargar la ficha del paciente');
+      const data = await response.json();
+      setSelectedPatient(data);
+    } catch (err) {
+      console.error("Error al cargar ficha del paciente:", err);
+    }
+  };
 
-  // Acción 1: Vínculo Clínico (Enfermera)
-  const handleVinculoClinico = (e) => {
+  // Acción 1: Vínculo Clínico (Enfermera) — ahora persiste de verdad, ya no es un alert()
+  const handleVinculoClinico = async (e) => {
     e.preventDefault();
     if (!selectedPatient) return alert("ERROR: Debe buscar y seleccionar un paciente.");
     if (!cajaCode) return alert("ERROR: Ingrese el código de la caja.");
-    alert(`SICTEQ INFORMA:\nAsociación exitosa. La caja "${cajaCode}" quedó vinculada a la ficha clínica de ${selectedPatient.nombre}.`);
+
+    setVinculoStatus({ loading: true, message: '', type: '' });
+
+    try {
+      const response = await fetch(`${API_URL}/api/vinculos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rut: selectedPatient.rut, codigo_caja: cajaCode, usuario_id: user.id })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Error al registrar el vínculo');
+
+      setVinculoStatus({ loading: false, message: data.message || 'Asociación exitosa.', type: 'success' });
+      setCajaCode('');
+
+      // Refrescamos la ficha del paciente (nuevo item en el historial) y la lista
+      // general (para que se actualice el contador "Vinculada (N)").
+      selectPatient(selectedPatient.rut);
+      loadPacientes();
+
+      setTimeout(() => setVinculoStatus({ loading: false, message: '', type: '' }), 4000);
+    } catch (error) {
+      setVinculoStatus({ loading: false, message: error.message, type: 'error' });
+    }
   };
 
   // Acción 2: Despacho de Caja (TENS)
   const handleDespacho = async (e) => {
     e.preventDefault();
     if (!cajaCode) return alert("ERROR: Ingrese el código o folio de la caja a despachar.");
-    
+
     setStatus({ loading: true, message: '', type: '' });
 
     try {
@@ -63,9 +107,9 @@ export default function Vinculo({ user }) {
       if (!response.ok) throw new Error('Error al despachar la solicitud');
 
       setStatus({ loading: false, message: '¡Caja despachada con éxito a Pabellón!', type: 'success' });
-      
+
       // Volver al Dashboard después de 2 segundos para ver que desapareció de la lista
-      setTimeout(() => navigate('/'), 2000); 
+      setTimeout(() => navigate('/'), 2000);
 
     } catch (error) {
       setStatus({ loading: false, message: error.message, type: 'error' });
@@ -74,7 +118,7 @@ export default function Vinculo({ user }) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Alertas de Éxito o Error del Despacho */}
       {status.message && (
         <div className={`p-4 rounded-lg text-sm font-medium text-center shadow-sm max-w-lg mx-auto ${status.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
@@ -99,19 +143,19 @@ export default function Vinculo({ user }) {
                 <h3 className="font-bold text-slate-900 text-lg">Despacho de Instrumental</h3>
                 <p className="text-xs text-slate-500 mt-1">Asignando caja física a la Solicitud <span className="font-bold text-sky-600">REQ-{solicitudId}</span></p>
             </div>
-            
+
             <form onSubmit={handleDespacho} className="space-y-6">
                 <div className="flex flex-col gap-1">
                     <label className="text-xs font-bold text-slate-500 uppercase text-center">Escanee o Digite el Código de la Caja</label>
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         placeholder="Ej: CAJA-LAP-042"
-                        className="p-3 border border-slate-300 rounded-lg text-center text-lg bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-sky-500 uppercase" 
+                        className="p-3 border border-slate-300 rounded-lg text-center text-lg bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-sky-500 uppercase"
                         value={cajaCode}
                         onChange={(e) => setCajaCode(e.target.value.toUpperCase())}
                     />
                 </div>
-                
+
                 <div className="flex gap-3">
                   <button type="button" onClick={() => navigate('/')} className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-lg text-xs transition-colors">
                     Cancelar
@@ -159,16 +203,16 @@ export default function Vinculo({ user }) {
                           <tr key={p.rut} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selectedPatient?.rut === p.rut ? 'bg-sky-50' : ''}`}>
                               <td className="px-6 py-3 font-mono text-slate-500">{p.rut}</td>
                               <td className="px-6 py-3 font-bold text-slate-800">{p.nombre}</td>
-                              <td className="px-6 py-3">{p.pabellón}</td>
+                              <td className="px-6 py-3">{p.area_nombre || '—'}</td>
                               <td className="px-6 py-3">
-                                  {p.historial.length > 0 ? (
-                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Vinculada ({p.historial.length})</span>
+                                  {Number(p.cajas_vinculadas) > 0 ? (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Vinculada ({p.cajas_vinculadas})</span>
                                   ) : (
                                       <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Sin vincular</span>
                                   )}
                               </td>
                               <td className="px-6 py-3 text-center">
-                                  <button type="button" onClick={() => setSelectedPatient(p)} className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+                                  <button type="button" onClick={() => selectPatient(p.rut)} className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
                                       Seleccionar
                                   </button>
                               </td>
@@ -192,6 +236,12 @@ export default function Vinculo({ user }) {
                   <p className="text-xs text-slate-500">Seleccioná un paciente de la lista de arriba y emparejalo con la caja quirúrgica recepcionada.</p>
               </div>
 
+              {vinculoStatus.message && (
+                  <div className={`p-3 rounded-lg text-xs font-medium text-center ${vinculoStatus.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                      {vinculoStatus.message}
+                  </div>
+              )}
+
               <form onSubmit={handleVinculoClinico} className="space-y-4">
                   <div className="p-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50">
                       <span className="text-[10px] font-bold text-slate-400 uppercase block">Paciente seleccionado</span>
@@ -209,11 +259,13 @@ export default function Vinculo({ user }) {
                           className="p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-sky-500 uppercase"
                           value={cajaCode}
                           onChange={(e) => setCajaCode(e.target.value.toUpperCase())}
+                          placeholder="Ej: CAJA-0045"
                       />
                   </div>
 
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg text-xs transition-colors shadow-md flex items-center justify-center gap-2">
-                      <i className="fa-solid fa-floppy-disk"></i> Confirmar Asociación Clínica
+                  <button type="submit" disabled={vinculoStatus.loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold py-3 rounded-lg text-xs transition-colors shadow-md flex items-center justify-center gap-2">
+                      {vinculoStatus.loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>}
+                      Confirmar Asociación Clínica
                   </button>
               </form>
           </div>
@@ -232,24 +284,24 @@ export default function Vinculo({ user }) {
                       <div className="grid grid-cols-2 gap-3 text-xs">
                           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                               <span className="text-[10px] uppercase font-bold text-slate-400 block">Ubicación Actual</span>
-                              <p className="font-bold text-slate-700 mt-0.5">{selectedPatient.pabellón}</p>
+                              <p className="font-bold text-slate-700 mt-0.5">{selectedPatient.area_nombre || '—'}</p>
                           </div>
                           <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
                               <span className="text-[10px] uppercase font-bold text-emerald-600 block">Alertas IAAS</span>
-                              <p className="font-bold text-emerald-700 mt-0.5">Ninguna reportada</p>
+                              <p className="font-bold text-emerald-700 mt-0.5">{selectedPatient.alertas_iaas || 'Ninguna reportada'}</p>
                           </div>
                       </div>
                       <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Diagnóstico Médico</span>
                           <p className="text-xs text-slate-700 font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1">{selectedPatient.diagnostico}</p>
                       </div>
-                      
+
                       <div className="pt-2 border-t border-slate-100">
                           <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Historial de Cajas Vinculadas</h5>
                           <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2">
-                              {selectedPatient.historial.length > 0 ? selectedPatient.historial.map((h, i) => (
-                                  <div key={i} className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-200 text-xs font-medium text-slate-700">
-                                      <span><i className="fa-solid fa-box text-slate-400 mr-2"></i>{h}</span>
+                              {selectedPatient.historial && selectedPatient.historial.length > 0 ? selectedPatient.historial.map((h) => (
+                                  <div key={h.id} className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-200 text-xs font-medium text-slate-700">
+                                      <span><i className="fa-solid fa-box text-slate-400 mr-2"></i>{h.codigo_caja} ({h.nombre_equipo})</span>
                                       <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">Asociado</span>
                                   </div>
                               )) : <p className="text-slate-400 italic text-xs">Sin registros recientes.</p>}

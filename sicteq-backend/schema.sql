@@ -17,6 +17,13 @@
 -- tiempo_minutos a historial_movimiento -- se completan solo al pasar por
 -- la etapa de Esterilización, para cumplir el requerimiento formal de
 -- registrar los parámetros del ciclo, no solo el nombre de la etapa.
+--
+-- 2026-08-24 (3): se agregan PACIENTE y VINCULO_CAJA_PACIENTE. Antes el
+-- "Vínculo Clínico" era 100% mock (3 pacientes hardcodeados en el
+-- frontend, sin persistencia). VINCULO_CAJA_PACIENTE es la tabla que da
+-- la trazabilidad BIDIRECCIONAL real que pide el requerimiento: desde
+-- una caja física se puede ver a qué paciente(s) se usó, y desde un
+-- paciente se puede ver qué cajas se le vincularon.
 -- ==========================================
 
 -- 1. TABLAS MAESTRAS (Sin dependencias)
@@ -126,4 +133,26 @@ CREATE TABLE vinculo_trazabilidad (
     inventario_id INTEGER REFERENCES inventario(id),
     cantidad_procesada INTEGER,
     resultado VARCHAR(50)
+);
+
+-- 9. PACIENTE (Depende de Area)
+CREATE TABLE paciente (
+    id SERIAL PRIMARY KEY,
+    rut VARCHAR(12) UNIQUE NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    edad INTEGER,
+    area_id INTEGER REFERENCES area(id),
+    diagnostico VARCHAR(255),
+    alertas_iaas VARCHAR(255)
+);
+
+-- 10. VÍNCULO CAJA-PACIENTE (Depende de Caja Física, Paciente y Usuario)
+-- Cada fila es un evento de asociación real: da la trazabilidad
+-- bidireccional caja <-> paciente.
+CREATE TABLE vinculo_caja_paciente (
+    id SERIAL PRIMARY KEY,
+    caja_fisica_id INTEGER REFERENCES caja_fisica(id),
+    paciente_id INTEGER REFERENCES paciente(id),
+    usuario_id INTEGER REFERENCES usuario(id),
+    fecha_vinculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

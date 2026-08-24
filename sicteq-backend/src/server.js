@@ -11,6 +11,8 @@ const authRoutes = require('./routes/authRoutes');
 const solicitudesRoutes = require('./routes/solicitudesRoutes');
 const inventarioRoutes = require('./routes/inventarioRoutes');
 const cajaFisicaRoutes = require('./routes/cajaFisicaRoutes');
+const pacienteRoutes = require('./routes/pacienteRoutes');
+const vinculoRoutes = require('./routes/vinculoRoutes');
 
 // Middlewares
 // Configuración de CORS permisiva para depuración
@@ -30,6 +32,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/solicitudes', solicitudesRoutes);
 app.use('/api/inventario', inventarioRoutes);
 app.use('/api/cajas', cajaFisicaRoutes);
+app.use('/api/pacientes', pacienteRoutes);
+app.use('/api/vinculos', vinculoRoutes);
 
 // Ruta de Salud para probar que el servidor responde
 app.get('/api/health', (req, res) => {
