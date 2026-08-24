@@ -45,7 +45,10 @@ const getDashboardData = async (req, res) => {
 };
 
 const getHistorialCaja = async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+    if (!id || isNaN(id)) {
+        return res.status(400).json({ error: "Id de inventario inválido" });
+    }
     try {
         const result = await db.query(`
             SELECT h.*, a.nombre AS destino_nombre
