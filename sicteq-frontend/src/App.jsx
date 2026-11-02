@@ -9,6 +9,8 @@ import Ciclo from './components/Ciclo'
 import Vinculo from './components/Vinculo'
 import Inventario from './components/Inventario'
 import Reportes from './components/Reportes'
+import Autoclave from './components/Autoclave'
+import Auditoria from './components/Auditoria'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -71,6 +73,8 @@ function App() {
                 <Route path="/vinculo" element={<Vinculo user={user} />} />
                 <Route path="/inventario" element={<Inventario />} />
                 <Route path="/reportes" element={<Reportes />} />
+                <Route path="/autoclave" element={<Autoclave user={user} />} />
+                <Route path="/auditoria" element={<Auditoria user={user} />} />
               </Routes>
           </main>
         </div>

@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 // Lista de pacientes con la cantidad de cajas que tienen vinculadas
 // (dirección paciente -> cajas).
@@ -56,6 +57,8 @@ const getPacienteDetalle = async (req, res) => {
             ORDER BY v.fecha_vinculo DESC
         `, [paciente.id]);
 
+        // Ley 20.584: queda registro de quién consultó la ficha y cuándo.
+        await registrarAuditoria(req, 'consulta_ficha_paciente', 'paciente', paciente.id);
         res.json({ ...paciente, historial: historial.rows });
     } catch (err) {
         console.error("Error al obtener ficha del paciente:", err);

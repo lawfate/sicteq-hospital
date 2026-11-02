@@ -36,7 +36,7 @@ export default function Ciclo() {
   const [temperatura, setTemperatura] = useState("");
   const [presion, setPresion] = useState("");
   const [tiempoMinutos, setTiempoMinutos] = useState("");
-  const [vigenciaDias, setVigenciaDias] = useState("30");
+  const [vigenciaDias, setVigenciaDias] = useState("365");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const steps = [
@@ -155,7 +155,7 @@ export default function Ciclo() {
       setTemperatura("");
       setPresion("");
       setTiempoMinutos("");
-      setVigenciaDias("30");
+      setVigenciaDias("365");
       setIsModalOpen(false);
       alert("Etapa actualizada con éxito");
 
@@ -286,7 +286,7 @@ export default function Ciclo() {
                       {targetStage === 5 && (
                           <div className="flex flex-col gap-1 pt-1 border-t border-sky-100">
                               <label className="text-[11px] font-bold text-slate-500 uppercase">Vigencia del empaque (días)</label>
-                              <input type="number" min="1" className="w-32 p-2 rounded text-sm border border-slate-300" value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} placeholder="30" />
+                              <input type="number" min="1" className="w-32 p-2 rounded text-sm border border-slate-300" value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} placeholder="365" />
                               <p className="text-[11px] text-sky-700">Desde hoy se calcula la fecha de caducidad del empaque estéril.</p>
                           </div>
                       )}

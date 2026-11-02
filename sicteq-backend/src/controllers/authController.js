@@ -1,7 +1,9 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/jwt');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const login = async (req, res) => {
     const { rut, password } = req.body;
@@ -23,6 +25,7 @@ const login = async (req, res) => {
         `, [rut]);
 
         if (result.rows.length === 0) {
+            await registrarAuditoria(req, 'login_fallido', 'usuario', rut, { motivo: 'rut_inexistente' });
             return res.status(401).json({ error: "RUT o contraseña incorrectos" });
         }
 
@@ -30,11 +33,17 @@ const login = async (req, res) => {
         const passwordOk = await bcrypt.compare(password, row.password_hash);
 
         if (!passwordOk) {
+            await registrarAuditoria(req, 'login_fallido', 'usuario', row.id, { motivo: 'password_incorrecta' }, row.id);
             return res.status(401).json({ error: "RUT o contraseña incorrectos" });
         }
 
         const user = { id: row.id, rut: row.rut, nombre: row.nombre, rol: row.rol };
-        const token = jwt.sign({ id: row.id, rol_id: row.rol_id, rol: row.rol }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        // PB-02: cada login abre una sesión nueva (sid) y deja inválida la
+        // anterior del mismo usuario -- sin sesiones simultáneas.
+        const sid = crypto.randomUUID();
+        await db.query('UPDATE usuario SET sesion_id = $1, ultima_actividad = NOW() WHERE id = $2', [sid, row.id]);
+        const token = jwt.sign({ id: row.id, rol_id: row.rol_id, rol: row.rol, sid }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        await registrarAuditoria(req, 'login', 'usuario', row.id, null, row.id);
 
         res.json({ message: "Login exitoso", user, token });
 
@@ -44,4 +53,18 @@ const login = async (req, res) => {
     }
 };
 
-module.exports = { login };
+
+
+// Cierre de sesión explícito: invalida el sid en el servidor, no solo en el navegador.
+const logout = async (req, res) => {
+    try {
+        await db.query('UPDATE usuario SET sesion_id = NULL WHERE id = $1', [req.user.id]);
+        await registrarAuditoria(req, 'logout', 'usuario', req.user.id);
+        res.json({ message: 'Sesión cerrada' });
+    } catch (err) {
+        console.error('Error en logout:', err);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
+module.exports = { login, logout };

@@ -52,12 +52,20 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
                 <Link to="/ciclo" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/ciclo')}`}>
                     <i className="fa-solid fa-barcode text-lg w-5"></i> Ciclo Trazabilidad
                 </Link>
+                <Link to="/autoclave" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/autoclave')}`}>
+                    <i className="fa-solid fa-temperature-high text-lg w-5"></i> Cargas de Autoclave
+                </Link>
                 <Link to="/vinculo" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/vinculo')}`}>
                     <i className="fa-solid fa-link text-lg w-5"></i> Vínculo Clínico
                 </Link>
                 <Link to="/inventario" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/inventario')}`}>
                     <i className="fa-solid fa-boxes-stacked text-lg w-5"></i> Inventario y Mermas
                 </Link>
+                {user.role === 'IT' && (
+                <Link to="/auditoria" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/auditoria')}`}>
+                    <i className="fa-solid fa-user-shield text-lg w-5"></i> Auditoría
+                </Link>
+                )}
                 <Link to="/reportes" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/reportes')}`}>
                     <i className="fa-solid fa-file-lines text-lg w-5"></i> Reportes de Gestión
                 </Link>

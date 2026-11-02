@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const nullable = (v) => (v === undefined || v === '' ? null : v);
 
@@ -45,7 +46,8 @@ const getAreas = async (req, res) => {
 
 // POST: Guardar la nueva solicitud
 const crearSolicitud = async (req, res) => {
-    const { usuario_id, area_id, tipo_cirugia, instrumental, observaciones } = req.body;
+    const { area_id, tipo_cirugia, instrumental, observaciones } = req.body;
+    const usuario_id = req.user.id; // del token, no del body
 
     try {
         const obsFinal = `[Instrumental Requerido: ${instrumental}] ${observaciones ? '- ' + observaciones : ''}`;
@@ -56,6 +58,7 @@ const crearSolicitud = async (req, res) => {
             [usuario_id, area_id, tipo_cirugia, obsFinal]
         );
 
+        await registrarAuditoria(req, 'crear_solicitud', 'solicitud', result.rows[0].id, { area_id, tipo_cirugia });
         res.json({ message: 'Solicitud creada con éxito', id: result.rows[0].id });
     } catch (error) {
         console.error("Error al crear solicitud:", error);
@@ -66,7 +69,8 @@ const crearSolicitud = async (req, res) => {
 // PUT: Despachar la solicitud, asignarle una caja y registrar el movimiento
 const despacharSolicitud = async (req, res) => {
     const { id } = req.params;
-    const { caja_codigo, usuario_id } = req.body; 
+    const { caja_codigo } = req.body;
+    const usuario_id = req.user.id; // del token, no del body
 
     try {
         // 1. Iniciamos transacción
@@ -108,19 +112,21 @@ const despacharSolicitud = async (req, res) => {
 
         // 4. Registramos el movimiento en el historial
         await db.query(
-            `INSERT INTO HISTORIAL_MOVIMIENTO (inventario_id, caja_fisica_id, area_destino_id, estado_nuevo, justificacion, fecha_cambio)
+            `INSERT INTO HISTORIAL_MOVIMIENTO (inventario_id, caja_fisica_id, area_destino_id, estado_nuevo, justificacion, fecha_cambio, usuario_id)
              VALUES (
                 $1,
                 $2,
                 (SELECT area_id FROM SOLICITUD WHERE id = $3),
                 'Despachado',
                 $4,
-                NOW()
+                NOW(),
+                $5
              )`,
-            [inventario_id, caja_fisica_id, id, `Despacho de caja ${caja_codigo} para solicitud REQ-${id}`]
+            [inventario_id, caja_fisica_id, id, `Despacho de caja ${caja_codigo} para solicitud REQ-${id}`, usuario_id]
         );
 
         await db.query('COMMIT');
+        await registrarAuditoria(req, 'despachar_solicitud', 'solicitud', id, { caja_codigo });
         res.json({ message: 'Solicitud despachada y movimiento registrado con éxito' });
     } catch (error) {
         await db.query('ROLLBACK');

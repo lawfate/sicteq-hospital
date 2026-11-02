@@ -15,7 +15,12 @@ const pacienteRoutes = require('./routes/pacienteRoutes');
 const vinculoRoutes = require('./routes/vinculoRoutes');
 const alertasRoutes = require('./routes/alertasRoutes');
 const reportesRoutes = require('./routes/reportesRoutes');
+const cicloRoutes = require('./routes/cicloRoutes');
+const auditoriaRoutes = require('./routes/auditoriaRoutes');
 const { requireAuth } = require('./middleware/authMiddleware');
+
+// Render está detrás de un proxy: así req.ip es la IP real del cliente (auditoría).
+app.set('trust proxy', 1);
 
 // Middlewares
 // Configuración de CORS permisiva para depuración
@@ -40,6 +45,8 @@ app.use('/api/pacientes', requireAuth, pacienteRoutes);
 app.use('/api/vinculos', requireAuth, vinculoRoutes);
 app.use('/api/alertas', requireAuth, alertasRoutes);
 app.use('/api/reportes', requireAuth, reportesRoutes);
+app.use('/api/ciclos', requireAuth, cicloRoutes);
+app.use('/api/auditoria', requireAuth, auditoriaRoutes);
 
 // Ruta de Salud para probar que el servidor responde
 app.get('/api/health', (req, res) => {
