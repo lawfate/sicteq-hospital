@@ -66,72 +66,78 @@ const crearSolicitud = async (req, res) => {
     }
 };
 
-// PUT: Despachar la solicitud, asignarle una caja y registrar el movimiento
+// PUT: Despachar la solicitud con una caja física concreta. Antes no se
+// verificaba nada de la caja: se podía despachar una de una carga No estéril,
+// con el empaque vencido o que ni siquiera estaba en bodega. Además usa una
+// transacción real (cliente dedicado): BEGIN/COMMIT sobre el pool podían caer
+// en conexiones distintas.
 const despacharSolicitud = async (req, res) => {
-    const { id } = req.params;
-    const { caja_codigo } = req.body;
+    const id = Number(req.params.id);
+    const caja_codigo = String(req.body.caja_codigo || '').trim().toUpperCase();
     const usuario_id = req.user.id; // del token, no del body
 
+    if (!Number.isInteger(id) || id <= 0 || !caja_codigo) {
+        return res.status(400).json({ error: 'Se requiere una solicitud válida y el código de la caja.' });
+    }
+
+    const rechazar = async (status, motivo) => {
+        await registrarAuditoria(req, 'despacho_bloqueado', 'solicitud', id, { caja_codigo, motivo });
+        return res.status(status).json({ error: motivo });
+    };
+
+    const client = await db.connect();
     try {
-        // 1. Iniciamos transacción
-        await db.query('BEGIN');
+        await client.query('BEGIN');
 
-        // 2. Buscamos la caja FÍSICA individual por su código (ej. CAJA-0045),
-        // no el tipo/categoría (inventario.codigo_barra, ej. GEN-001). El TENS
-        // despacha una unidad física concreta, no "un tipo de caja".
-        const cajaResult = await db.query(
-            "SELECT id, inventario_id FROM CAJA_FISICA WHERE codigo_caja = $1 LIMIT 1",
-            [caja_codigo]
-        );
+        const sol = await client.query('SELECT id, estado, area_id FROM solicitud WHERE id = $1 FOR UPDATE', [id]);
+        if (sol.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Solicitud no encontrada' }); }
+        if (sol.rows[0].estado === 'Despachado') { await client.query('ROLLBACK'); return res.status(409).json({ error: `La solicitud REQ-${id} ya fue despachada.` }); }
 
-        if (cajaResult.rows.length === 0) {
-            await db.query('ROLLBACK');
-            return res.status(404).json({ error: `No se encontró ninguna caja con el código "${caja_codigo}"` });
+        const caja = await client.query(`
+            SELECT cf.id, cf.inventario_id, cf.fecha_caducidad,
+                   (SELECT estado_nuevo FROM historial_movimiento h WHERE h.caja_fisica_id = cf.id ORDER BY h.fecha_cambio DESC, h.id DESC LIMIT 1) AS etapa,
+                   (SELECT c.estado || '|M' || c.numero_maquina || '-C' || c.numero_ciclo
+                      FROM vinculo_trazabilidad v JOIN ciclo_esterilizacion c ON c.id = v.ciclo_id
+                     WHERE v.caja_fisica_id = cf.id ORDER BY v.fecha DESC, v.id DESC LIMIT 1) AS carga
+            FROM caja_fisica cf WHERE cf.codigo_caja = $1 LIMIT 1`, [caja_codigo]);
+        if (caja.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: `No se encontró ninguna caja con el código "${caja_codigo}"` }); }
+        const k = caja.rows[0];
+
+        // Reglas de seguridad del paciente: solo sale de la Central una caja
+        // almacenada, de una carga liberada como Estéril y con empaque vigente.
+        if (k.etapa !== 'Etapa 5') {
+            await client.query('ROLLBACK');
+            return rechazar(409, `La caja ${caja_codigo} no está en Almacenamiento (estado actual: ${k.etapa || 'sin movimientos'}). Solo se despachan cajas estériles almacenadas.`);
+        }
+        if (k.carga && !k.carga.startsWith('Estéril|')) {
+            const [estado, carga] = k.carga.split('|');
+            await client.query('ROLLBACK');
+            return rechazar(409, `La caja ${caja_codigo} pertenece a la carga ${carga} con estado "${estado}". No se puede despachar.`);
+        }
+        if (!k.fecha_caducidad || new Date(k.fecha_caducidad) <= new Date()) {
+            await client.query('ROLLBACK');
+            return rechazar(409, k.fecha_caducidad
+                ? `El empaque de la caja ${caja_codigo} está vencido. Debe reprocesarse antes de despacharla.`
+                : `La caja ${caja_codigo} no tiene fecha de caducidad registrada. Regístrela en Almacenamiento antes de despacharla.`);
         }
 
-        const { id: caja_fisica_id, inventario_id } = cajaResult.rows[0];
+        // Descuenta el stock disponible del tipo de caja despachado.
+        await client.query('UPDATE inventario SET cantidad_disponible = GREATEST(cantidad_disponible - 1, 0) WHERE id = $1', [k.inventario_id]);
+        await client.query("UPDATE solicitud SET estado = 'Despachado' WHERE id = $1", [id]);
+        await client.query(
+            `INSERT INTO historial_movimiento (inventario_id, caja_fisica_id, area_destino_id, estado_anterior, estado_nuevo, justificacion, fecha_cambio, usuario_id, solicitud_id)
+             VALUES ($1, $2, $3, $4, 'Despachado', $5, NOW(), $6, $7)`,
+            [k.inventario_id, k.id, sol.rows[0].area_id, k.etapa, `Despacho de caja ${caja_codigo} para solicitud REQ-${id}`, usuario_id, id]);
 
-        // 2b. Descontamos el stock disponible del tipo de caja despachado.
-        // Antes esto nunca se tocaba: el inventario mostrado no reflejaba
-        // los despachos reales, sin importar cuántos hubiera.
-        await db.query(
-            "UPDATE inventario SET cantidad_disponible = GREATEST(cantidad_disponible - 1, 0) WHERE id = $1",
-            [inventario_id]
-        );
-
-        // 3. Actualizamos el estado de la solicitud
-        const result = await db.query(
-            "UPDATE solicitud SET estado = 'Despachado' WHERE id = $1 RETURNING id",
-            [id]
-        );
-
-        if (result.rowCount === 0) {
-            await db.query('ROLLBACK');
-            return res.status(404).json({ error: 'Solicitud no encontrada' });
-        }
-
-        // 4. Registramos el movimiento en el historial
-        await db.query(
-            `INSERT INTO HISTORIAL_MOVIMIENTO (inventario_id, caja_fisica_id, area_destino_id, estado_nuevo, justificacion, fecha_cambio, usuario_id)
-             VALUES (
-                $1,
-                $2,
-                (SELECT area_id FROM SOLICITUD WHERE id = $3),
-                'Despachado',
-                $4,
-                NOW(),
-                $5
-             )`,
-            [inventario_id, caja_fisica_id, id, `Despacho de caja ${caja_codigo} para solicitud REQ-${id}`, usuario_id]
-        );
-
-        await db.query('COMMIT');
+        await client.query('COMMIT');
         await registrarAuditoria(req, 'despachar_solicitud', 'solicitud', id, { caja_codigo });
         res.json({ message: 'Solicitud despachada y movimiento registrado con éxito' });
     } catch (error) {
-        await db.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         console.error("Error al despachar solicitud:", error);
         res.status(500).json({ error: 'Error interno del servidor al despachar' });
+    } finally {
+        client.release();
     }
 };
 

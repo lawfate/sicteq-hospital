@@ -5,6 +5,10 @@ const crypto = require('crypto');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/jwt');
 const { registrarAuditoria } = require('../utils/auditoria');
 
+// PB-11: tras 5 intentos fallidos la cuenta queda bloqueada 15 minutos.
+const MAX_INTENTOS = 5;
+const MINUTOS_BLOQUEO = 15;
+
 const login = async (req, res) => {
     const { rut, password } = req.body;
 
@@ -18,7 +22,8 @@ const login = async (req, res) => {
         // hash bcrypt, no texto plano, así que hay que traer la fila y
         // comparar con bcrypt.compare.
         const result = await db.query(`
-            SELECT u.id, u.rut, u.nombre, u.password_hash, u.rol_id, r.nombre as rol
+            SELECT u.id, u.rut, u.nombre, u.password_hash, u.rol_id, r.nombre as rol,
+                   CEIL(EXTRACT(EPOCH FROM (u.bloqueado_hasta - NOW())) / 60)::int AS minutos_bloqueo
             FROM usuario u
             JOIN rol r ON u.rol_id = r.id
             WHERE u.rut = $1 AND u.activo = true
@@ -30,18 +35,33 @@ const login = async (req, res) => {
         }
 
         const row = result.rows[0];
+        if (row.minutos_bloqueo > 0) {
+            await registrarAuditoria(req, 'login_fallido', 'usuario', row.id, { motivo: 'cuenta_bloqueada' }, row.id);
+            return res.status(429).json({ error: `Cuenta bloqueada por intentos fallidos. Intenta de nuevo en ${row.minutos_bloqueo} minuto(s).` });
+        }
+
         const passwordOk = await bcrypt.compare(password, row.password_hash);
 
         if (!passwordOk) {
-            await registrarAuditoria(req, 'login_fallido', 'usuario', row.id, { motivo: 'password_incorrecta' }, row.id);
-            return res.status(401).json({ error: "RUT o contraseña incorrectos" });
+            const upd = await db.query(`
+                UPDATE usuario
+                SET intentos_fallidos = intentos_fallidos + 1,
+                    bloqueado_hasta = CASE WHEN intentos_fallidos + 1 >= $2 THEN NOW() + make_interval(mins => $3) ELSE NULL END
+                WHERE id = $1 RETURNING intentos_fallidos`, [row.id, MAX_INTENTOS, MINUTOS_BLOQUEO]);
+            const intentos = upd.rows[0].intentos_fallidos;
+            await registrarAuditoria(req, 'login_fallido', 'usuario', row.id, { motivo: 'password_incorrecta', intentos }, row.id);
+            if (intentos >= MAX_INTENTOS) {
+                await registrarAuditoria(req, 'cuenta_bloqueada', 'usuario', row.id, { minutos: MINUTOS_BLOQUEO }, row.id);
+                return res.status(429).json({ error: `Demasiados intentos fallidos. La cuenta quedó bloqueada ${MINUTOS_BLOQUEO} minutos.` });
+            }
+            return res.status(401).json({ error: `RUT o contraseña incorrectos (intento ${intentos} de ${MAX_INTENTOS}).` });
         }
 
         const user = { id: row.id, rut: row.rut, nombre: row.nombre, rol: row.rol };
         // PB-02: cada login abre una sesión nueva (sid) y deja inválida la
         // anterior del mismo usuario -- sin sesiones simultáneas.
         const sid = crypto.randomUUID();
-        await db.query('UPDATE usuario SET sesion_id = $1, ultima_actividad = NOW() WHERE id = $2', [sid, row.id]);
+        await db.query('UPDATE usuario SET sesion_id = $1, ultima_actividad = NOW(), intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $2', [sid, row.id]);
         const token = jwt.sign({ id: row.id, rol_id: row.rol_id, rol: row.rol, sid }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
         await registrarAuditoria(req, 'login', 'usuario', row.id, null, row.id);
 

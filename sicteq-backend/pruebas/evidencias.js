@@ -108,6 +108,45 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
     const cad = (await db.query(`SELECT ROUND(EXTRACT(EPOCH FROM (fecha_caducidad - NOW())) / 86400) AS dias FROM caja_fisica WHERE id = $1`, [c1.id])).rows[0];
     check('PB-05', 'Vigencia del empaque por defecto = 365 días', 365, Number(cad.dias), `${cad.dias} días hasta la caducidad`);
 
+    // ---------------- Despacho seguro ----------------
+    const area = (await db.query(`SELECT id FROM area WHERE nombre LIKE 'Pabellón%' ORDER BY id LIMIT 1`)).rows[0].id;
+    const nuevaSol = async () => (await api('POST', '/api/solicitudes', enf, { area_id: area, tipo_cirugia: 'Programada', instrumental: 'Prueba de despacho seguro' })).json.id;
+    let sol = await nuevaSol();
+    r = await api('PUT', `/api/solicitudes/${sol}/despachar`, tens, { caja_codigo: c2.codigo_caja });
+    check('Despacho', 'No se despacha una caja que no está en Almacenamiento', 409, r.status, r.json);
+    // Alguien la marca en Almacenamiento saltándose el proceso: igual la frena la carga No estéril.
+    await db.query(`INSERT INTO historial_movimiento (inventario_id, caja_fisica_id, estado_nuevo, fecha_cambio, justificacion)
+                    SELECT inventario_id, id, 'Etapa 5', NOW(), 'Prueba: almacenada sin carga estéril' FROM caja_fisica WHERE id = $1`, [c2.id]);
+    await db.query(`UPDATE caja_fisica SET fecha_caducidad = NOW() + INTERVAL '365 days' WHERE id = $1`, [c2.id]);
+    r = await api('PUT', `/api/solicitudes/${sol}/despachar`, tens, { caja_codigo: c2.codigo_caja });
+    check('Despacho', 'No se despacha una caja de una carga No estéril', 409, r.status, r.json);
+    await db.query(`UPDATE caja_fisica SET fecha_caducidad = NOW() - INTERVAL '1 day' WHERE id = $1`, [c1.id]);
+    r = await api('PUT', `/api/solicitudes/${sol}/despachar`, tens, { caja_codigo: c1.codigo_caja });
+    check('Despacho', 'No se despacha una caja con el empaque vencido', 409, r.status, r.json);
+    await db.query(`UPDATE caja_fisica SET fecha_caducidad = NOW() + INTERVAL '365 days' WHERE id = $1`, [c1.id]);
+    r = await api('PUT', `/api/solicitudes/${sol}/despachar`, enf, { caja_codigo: c1.codigo_caja });
+    check('PB-02', 'Enfermera no despacha (rol TENS/IT)', 403, r.status, r.json);
+    r = await api('PUT', `/api/solicitudes/${sol}/despachar`, tens, { caja_codigo: c1.codigo_caja });
+    check('Despacho', 'Caja almacenada, de carga Estéril y vigente: se despacha', 200, r.status, r.json);
+    r = await api('PUT', `/api/solicitudes/${sol}/despachar`, tens, { caja_codigo: c1.codigo_caja });
+    check('Despacho', 'Una solicitud ya despachada no se despacha de nuevo', 409, r.status, r.json);
+
+    // ---------------- PB-03 / PB-11: seguridad ----------------
+    const jwt = require('jsonwebtoken');
+    const falso = jwt.sign({ id: 3, rol: 'IT', rol_id: 3, sid: 'x' }, 'sicteq-dev-fallback-secret-inseguro-configurar-en-produccion');
+    r = await api('GET', '/api/auditoria', falso);
+    check('PB-03', 'Token firmado con el antiguo secreto de respaldo se rechaza', 401, r.status, r.json);
+    const cors = async (origen) => (await fetch(API + '/api/health', { headers: { Origin: origen } })).headers.get('access-control-allow-origin');
+    check('PB-03', 'CORS: el frontend propio está permitido', 'http://localhost:5173', await cors('http://localhost:5173'), '');
+    check('PB-03', 'CORS: un sitio ajeno no recibe permiso', 'null', String(await cors('https://sitio-ajeno.example')), '');
+    const victima = (await db.query(`SELECT rut FROM usuario WHERE id NOT IN (1, 2, 3) AND activo ORDER BY id DESC LIMIT 1`)).rows[0].rut;
+    let ultimo;
+    for (let i = 1; i <= 5; i++) ultimo = await api('POST', '/api/auth/login', null, { rut: victima, password: 'clave-equivocada' });
+    check('PB-11', '5 intentos fallidos bloquean la cuenta', 429, ultimo.status, ultimo.json);
+    r = await api('POST', '/api/auth/login', null, { rut: victima, password: '123456' });
+    check('PB-11', 'Bloqueada, ni con la clave correcta entra (15 min)', 429, r.status, r.json);
+    await db.query('UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE rut = $1', [victima]);
+
     // ---------------- PB-01: auditoría ----------------
     if (paciente) await api('GET', `/api/pacientes/${encodeURIComponent(paciente.rut)}`, enf);
     const tensId = (await db.query('SELECT id FROM usuario WHERE rut = $1', [USUARIOS.tens])).rows[0].id;
@@ -120,7 +159,7 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
     r = await api('GET', `/api/auditoria?desde=${encodeURIComponent(inicio.toISOString())}&limite=500`, it);
     check('PB-01', 'IT consulta la auditoría', 200, r.status, '');
     const acciones = new Set((Array.isArray(r.json) ? r.json : []).map(a => a.accion));
-    for (const a of ['login', 'crear_ciclo', 'resultado_ciclo', 'etapa_bloqueada', 'cambio_etapa', 'consulta_ficha_paciente', 'vinculo_caja_paciente']) {
+    for (const a of ['login', 'crear_ciclo', 'resultado_ciclo', 'etapa_bloqueada', 'cambio_etapa', 'consulta_ficha_paciente', 'vinculo_caja_paciente', 'despacho_bloqueado', 'despachar_solicitud', 'cuenta_bloqueada']) {
         check('PB-01', `Queda registrada la acción "${a}"`, true, acciones.has(a), '');
     }
     const muestra = (Array.isArray(r.json) ? r.json : []).slice(0, 12);
@@ -128,7 +167,7 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
     // ---------------- Reporte ----------------
     const ok = resultados.filter(x => x.ok).length;
     const md = [
-        `# Evidencia de pruebas — Sprint 1-2 SICTEQ`,
+        `# Evidencia de pruebas — Sprint noviembre SICTEQ`,
         ``,
         `- Fecha: ${inicio.toLocaleString('es-CL')}`,
         `- API: ${API} · Base: ${new URL(process.env.DATABASE_URL).host.split('.')[0]} (rama de pruebas)`,

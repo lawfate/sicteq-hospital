@@ -14,8 +14,10 @@ const ACCIONES = {
   despachar_solicitud: 'Despacho',
   vinculo_caja_paciente: 'Vínculo caja-paciente',
   consulta_ficha_paciente: 'Consulta de ficha',
+  despacho_bloqueado: 'Despacho bloqueado',
+  cuenta_bloqueada: 'Cuenta bloqueada',
 };
-const COLOR = { login_fallido: 'bg-red-100 text-red-700', etapa_bloqueada: 'bg-red-100 text-red-700', login: 'bg-emerald-100 text-emerald-700' };
+const COLOR = { login_fallido: 'bg-red-100 text-red-700', etapa_bloqueada: 'bg-red-100 text-red-700', despacho_bloqueado: 'bg-red-100 text-red-700', cuenta_bloqueada: 'bg-red-100 text-red-700', login: 'bg-emerald-100 text-emerald-700' };
 const inputCls = 'p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 outline-none';
 const fmt = (d) => new Date(d).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const detalleTexto = (d) => (d ? JSON.stringify(d) : '');

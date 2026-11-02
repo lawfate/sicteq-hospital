@@ -18,19 +18,25 @@ const reportesRoutes = require('./routes/reportesRoutes');
 const cicloRoutes = require('./routes/cicloRoutes');
 const auditoriaRoutes = require('./routes/auditoriaRoutes');
 const { requireAuth } = require('./middleware/authMiddleware');
+const { restringirIP } = require('./middleware/ipMiddleware');
+
+// PB-03: CORS solo para el frontend propio (antes '*'). Otros orígenes se
+// pueden agregar con CORS_ORIGINS separados por coma.
+const ORIGENES = (process.env.CORS_ORIGINS || 'https://sicteq-hospital.dhiegho122.workers.dev,http://localhost:5173')
+    .split(',').map(s => s.trim()).filter(Boolean);
 
 // Render está detrás de un proxy: así req.ip es la IP real del cliente (auditoría).
 app.set('trust proxy', 1);
 
 // Middlewares
-// Configuración de CORS permisiva para depuración
 app.use(cors({
-    origin: '*', 
+    origin: ORIGENES,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json()); // NECESARIO para procesar peticiones JSON
+app.use(restringirIP);
 
 // Rutas. /api/auth (login) y /api/health quedan públicas a propósito -- todo
 // lo demás exige sesión real desde acá. Antes ningún endpoint la exigía.

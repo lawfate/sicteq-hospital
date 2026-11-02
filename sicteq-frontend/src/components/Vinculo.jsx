@@ -103,7 +103,8 @@ export default function Vinculo({ user }) {
         body: JSON.stringify({ caja_codigo: cajaCode, usuario_id: user.id })
       });
 
-      if (!response.ok) throw new Error('Error al despachar la solicitud');
+      // Mostrar el motivo real (p. ej. carga No estéril o empaque vencido), no un error genérico.
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Error al despachar la solicitud');
 
       setStatus({ loading: false, message: '¡Caja despachada con éxito a Pabellón!', type: 'success' });
 
