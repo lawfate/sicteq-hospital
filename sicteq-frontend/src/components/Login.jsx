@@ -7,9 +7,12 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Motivo del último cierre de sesión (lo deja api.js o el cierre por inactividad).
+  const [motivoSalida] = useState(() => sessionStorage.getItem('sicteq_motivo_salida'));
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    sessionStorage.removeItem('sicteq_motivo_salida');
     setError('');
     setIsLoading(true);
 
@@ -60,6 +63,12 @@ export default function Login({ onLogin }) {
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
+                {motivoSalida && !error && (
+                  <div className="bg-amber-50 text-amber-700 p-3 rounded-lg text-sm border border-amber-200 text-center font-medium">
+                    <i className="fa-solid fa-clock mr-2"></i>{motivoSalida}
+                  </div>
+                )}
+
                 {/* Mensaje de Error */}
                 {error && (
                   <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100 text-center font-medium">
