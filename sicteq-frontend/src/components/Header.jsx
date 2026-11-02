@@ -11,7 +11,8 @@ export default function Header({ onMenuClick }) {
     '/inventario': 'Inventario y Mermas',
     '/reportes': 'Reportes de Gestión',
     '/autoclave': 'Cargas de Autoclave',
-    '/auditoria': 'Auditoría'
+    '/auditoria': 'Auditoría',
+    '/indicadores': 'Indicadores de Gestión'
   };
 
   return (

@@ -69,6 +69,9 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
                 <Link to="/reportes" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/reportes')}`}>
                     <i className="fa-solid fa-file-lines text-lg w-5"></i> Reportes de Gestión
                 </Link>
+                <Link to="/indicadores" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/indicadores')}`}>
+                    <i className="fa-solid fa-gauge-high text-lg w-5"></i> Indicadores (KPI)
+                </Link>
             </nav>
         </div>
         

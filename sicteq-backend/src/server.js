@@ -17,6 +17,7 @@ const alertasRoutes = require('./routes/alertasRoutes');
 const reportesRoutes = require('./routes/reportesRoutes');
 const cicloRoutes = require('./routes/cicloRoutes');
 const auditoriaRoutes = require('./routes/auditoriaRoutes');
+const indicadoresRoutes = require('./routes/indicadoresRoutes');
 const { requireAuth } = require('./middleware/authMiddleware');
 const { restringirIP } = require('./middleware/ipMiddleware');
 
@@ -53,6 +54,7 @@ app.use('/api/alertas', requireAuth, alertasRoutes);
 app.use('/api/reportes', requireAuth, reportesRoutes);
 app.use('/api/ciclos', requireAuth, cicloRoutes);
 app.use('/api/auditoria', requireAuth, auditoriaRoutes);
+app.use('/api/indicadores', requireAuth, indicadoresRoutes);
 
 // Ruta de Salud para probar que el servidor responde
 app.get('/api/health', (req, res) => {

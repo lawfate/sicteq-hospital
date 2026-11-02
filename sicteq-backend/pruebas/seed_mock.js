@@ -156,12 +156,14 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
             for (const caja of cajas) {
                 if (caja.prox > t || caja.enCarga || caja.enPabellon) continue;
                 if (caja.etapa === 1) { caja.etapa = 2; mov(caja, 'Etapa 2', t, { just: uno(['Lavado manual + termodesinfectora', 'Lavado ultrasónico', 'Lavado en termodesinfectora N°' + ent(1, 3)]) }); caja.prox = t + entre(1, 2.5) * HORA; }
+                else if (caja.etapa === 2 && rnd() < 0.05) { caja.etapa = 3; caja.prox = t + entre(0.5, 2) * HORA; caja.lista = true; }
                 else if (caja.etapa === 2) { caja.etapa = 3; mov(caja, 'Etapa 3', t, { just: `Cotejo ${caja.tipo[4]}/${caja.tipo[4]} piezas, empaque ${uno(['papel grado médico', 'contenedor rígido', 'textil de algodón'])}` }); caja.prox = t + entre(0.5, 2) * HORA; caja.lista = true; }
             }
 
             // Cargas de autoclave cada 2 h por máquina.
             if ((t % (2 * HORA)) === 0) {
-                for (const m of [1, 2, 3, 4]) {
+                const giro = (t / (2 * HORA)) % 4;
+                for (const m of [1, 2, 3, 4].map(x => ((x + giro - 1) % 4) + 1)) {
                     const listas = cajas.filter(k => k.etapa === 3 && k.lista && k.prox <= t && !k.enCarga);
                     if (listas.length === 0) break;
                     const lote = listas.slice(0, ent(3, 8));
@@ -217,10 +219,12 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
             }
 
             // Despacho: TENS entrega una caja estéril del tipo pedido.
-            for (const sol of pendientesSol.filter(s => s.estado === 'Pendiente' && s.t + 0.5 * HORA <= t)) {
+            const enCola = pendientesSol.filter(s => s.estado === 'Pendiente' && s.t + (s.tipo === 'Urgencia Médica' ? 0 : 0.5 * HORA) <= t + PASO);
+            enCola.sort((x, y) => (y.tipo === 'Urgencia Médica') - (x.tipo === 'Urgencia Médica') || x.t - y.t); // urgencias primero
+            for (const sol of enCola) {
                 const caja = cajas.find(k => k.inv === sol.tp && k.etapa === 5 && k.prox <= t && !k.enPabellon);
                 if (!caja) continue;
-                const tDesp = t + entre(0, 0.4) * HORA;
+                const tDesp = Math.max(t, sol.t) + (sol.tipo === 'Urgencia Médica' ? entre(5, 25) * 60000 : entre(0.2, 1.5) * HORA);
                 sol.estado = 'Despachado'; sol.caja = caja.codigo;
                 const usr = uno(TENS);
                 mov(caja, 'Despachado', tDesp, { usr, area: sol.area, sol: sol.id, just: `Despacho de caja ${caja.codigo} para solicitud REQ-${sol.id}`, auditar: false });
@@ -230,7 +234,7 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
                 const pac = pacientes.find(p => p.area === sol.area && rnd() < 0.5) || uno(pacientes);
                 const tVinc = tDesp + entre(0.5, 2) * HORA;
                 const enf = uno(ENFERMERAS);
-                vincP.push([caja.id, pac.id, enf, ts(tVinc)]);
+                if (rnd() < 0.92) vincP.push([caja.id, pac.id, enf, ts(tVinc)]);
                 audit.push([enf, 'vinculo_caja_paciente', 'caja_fisica', caja.codigo, JSON.stringify({ paciente_rut: pac.fila[1] }), tVinc]);
                 if (rnd() < 0.3) audit.push([enf, 'consulta_ficha_paciente', 'paciente', pac.id, null, tVinc - entre(0.1, 0.4) * HORA]);
                 caja.regreso = tVinc + entre(2, 6) * HORA;
@@ -250,10 +254,10 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
         abiertas.forEach((s, i) => { s.estado = i % 3 === 0 ? 'En Preparación' : i % 3 === 1 ? 'Listo' : 'Pendiente'; });
         // Algunas cajas de baja rotación con empaque por vencer o vencido (alertas).
         for (const [tipo, dias] of [['TRA-002', -3], ['MAX-001', 2], ['PED-001', 5], ['CAR-001', 6]]) {
-            const k = cajas.find(x => x.tipo[0] === tipo && !x.enCarga && !x.enPabellon);
+            const k = cajas.find(x => x.tipo[0] === tipo && x.etapa === 5 && !x.vieja) || cajas.find(x => x.etapa === 5 && !x.vieja);
             if (!k || k.enCarga || k.enPabellon) continue;
             const tAlm = AHORA + dias * DIA - 365 * DIA;
-            k.etapa = 5; k.caducidad = AHORA + dias * DIA;
+            k.vieja = true; k.etapa = 5; k.caducidad = AHORA + dias * DIA;
             hist.push({ inv: k.inv, caja: k.id, ant: 'Etapa 4', nuevo: 'Etapa 5', t: Math.max(tAlm, AHORA - 2 * HORA), area: 3, just: 'Caja de baja rotación: almacenada hace casi 1 año (dato de prueba para alertas)', usr: uno(TENS), sol: null, params: null });
         }
         // Un par de intentos bloqueados por carga No estéril (el control funcionando).

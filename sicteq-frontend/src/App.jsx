@@ -12,6 +12,7 @@ import Inventario from './components/Inventario'
 import Reportes from './components/Reportes'
 import Autoclave from './components/Autoclave'
 import Auditoria from './components/Auditoria'
+import Indicadores from './components/Indicadores'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -127,6 +128,7 @@ function App() {
                 <Route path="/reportes" element={<Reportes />} />
                 <Route path="/autoclave" element={<Autoclave user={user} />} />
                 <Route path="/auditoria" element={<Auditoria user={user} />} />
+                <Route path="/indicadores" element={<Indicadores />} />
               </Routes>
           </main>
         </div>
