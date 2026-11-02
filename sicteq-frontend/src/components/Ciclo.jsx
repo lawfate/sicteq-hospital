@@ -6,6 +6,8 @@ import { apiFetch } from '../api';
 // area_destino_id NO sirve para esto: esa columna referencia el pabellón/área
 // física de destino (tabla AREA), un concepto distinto de la etapa del ciclo.
 const parseStage = (estadoNuevo) => {
+  // El despacho a pabellón se registra como "Despachado": equivale a Entrega.
+  if (/despachad/i.test(String(estadoNuevo || ''))) return 6;
   const match = String(estadoNuevo || '').match(/Etapa\s*(\d+)/i);
   return match ? parseInt(match[1], 10) : 1;
 };

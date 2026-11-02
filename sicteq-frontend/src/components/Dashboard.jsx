@@ -14,7 +14,8 @@ export default function Dashboard() {
   });
   const [cajasCirculacion, setCajasCirculacion] = useState([]);
   const [showCajasCirculacion, setShowCajasCirculacion] = useState(false);
-  const [alertas, setAlertas] = useState({ stockBajo: [], cajasPorVencer: [] });
+  // null = todavía cargando (antes mostraba "Sin alertas" mientras llegaba la respuesta).
+  const [alertas, setAlertas] = useState(null);
 
   useEffect(() => {
     apiFetch(`/api/dashboard`)
@@ -98,7 +99,11 @@ export default function Dashboard() {
       </div>
 
       {/* ALERTAS PROACTIVAS: antes había que entrar a Inventario a mirar */}
-      {(alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0) ? (
+      {alertas === null ? (
+        <div className="mt-6 bg-white border border-slate-200 rounded-xl px-5 py-3 text-sm text-slate-400">
+          <i className="fa-solid fa-spinner fa-spin mr-2"></i>Cargando alertas…
+        </div>
+      ) : (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0) ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-amber-100 bg-amber-50 flex items-center gap-2">
