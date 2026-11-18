@@ -52,7 +52,7 @@ async function main() {
         // Verificación dentro de la misma transacción: si no calza, no se confirma nada.
         const malas = [];
         for (const t of r.orden) {
-            const { filas } = await leerTabla(db, t);
+            const { filas } = await leerTabla(db, t, r.tablas[t].columnas);
             const ok = hashFilas(filas) === r.tablas[t].hash;
             console.log(`  ${t.padEnd(24)} ${String(filas.length).padStart(6)} filas  ${ok ? 'OK' : 'DIFERENTE'}`);
             if (!ok) malas.push(t);

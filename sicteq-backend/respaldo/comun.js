@@ -62,8 +62,11 @@ async function tablasEnOrden(db) {
 // Lectura estable de una tabla: mismo orden siempre, para que el hash sea comparable.
 // shortcut: ordena por la 1a columna (en SICTEQ siempre es el id SERIAL); si una tabla
 // nueva no empieza por una columna única, la verificación del hash lo va a delatar.
-async function leerTabla(db, tabla) {
-    const r = await db.query(`SELECT * FROM "${tabla}" ORDER BY 1`);
+// Con `columnas` lee solo esas: un respaldo anterior a una migración se puede
+// verificar en una base que ya tiene columnas nuevas.
+async function leerTabla(db, tabla, columnas) {
+    const cols = columnas ? columnas.map(c => `"${c}"`).join(', ') : '*';
+    const r = await db.query(`SELECT ${cols} FROM "${tabla}" ORDER BY 1`);
     return { columnas: r.fields.map(f => f.name), filas: r.rows.map(row => r.fields.map(f => row[f.name])) };
 }
 
