@@ -8,7 +8,10 @@ types.setTypeParser(1114, (s) => new Date(s.replace(' ', 'T') + 'Z'));
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
+    // Cada consulta espera la ida y vuelta a Neon: con 10 conexiones (por defecto)
+    // el tope era ~20 peticiones/s en la prueba de carga. El host -pooler de Neon aguanta más.
+    max: 20
 });
 
 // Función de prueba explícita
