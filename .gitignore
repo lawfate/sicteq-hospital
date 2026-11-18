@@ -115,3 +115,6 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# PB-12: respaldos locales (traen datos de pacientes)
+respaldos/
