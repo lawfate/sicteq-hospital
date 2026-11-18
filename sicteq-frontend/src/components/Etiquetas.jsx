@@ -30,9 +30,11 @@ function imprimir(cajas) {
     .cab { font-size: 8pt; color: #444; margin-bottom: 2mm; }
     .cod { font: bold 14pt monospace; letter-spacing: 1px; }
     .tipo { font-size: 9pt; color: #333; }
-  </style></head><body><div class="grid">${etiquetas}</div>
-  <script>window.onload = () => { window.print(); }</script></body></html>`);
+  </style></head><body><div class="grid">${etiquetas}</div></body></html>`);
   w.document.close();
+  // Sin <script> en la ventana: la política CSP (script-src 'self') lo bloquearía.
+  w.focus();
+  w.print();
 }
 
 export default function Etiquetas() {

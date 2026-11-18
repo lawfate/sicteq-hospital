@@ -33,7 +33,7 @@ const buscarCaja = async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error("Error al buscar caja:", err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: "Error interno del servidor" });
     }
 };
 
@@ -158,7 +158,7 @@ const actualizarEtapa = async (req, res) => {
         res.json({ success: true, message: "Etapa actualizada correctamente" });
     } catch (err) {
         console.error(">>> [ERROR CRÍTICO] FALLO EN SQL:", err);
-        res.status(500).json({ error: "Error al insertar en la base de datos: " + err.message });
+        res.status(500).json({ error: "Error al guardar el cambio de etapa" });
     }
 };
 

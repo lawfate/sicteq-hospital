@@ -14,6 +14,9 @@ const etiqueta = (c) => `M${c.numero_maquina}-C${c.numero_ciclo}`;
 const listarCiclos = async (req, res) => {
     const maquina = req.query.maquina ? Number(req.query.maquina) : null;
     const numero = req.query.numero ? Number(req.query.numero) : null;
+    if ([maquina, numero].some(v => v !== null && !Number.isInteger(v))) {
+        return res.status(400).json({ error: 'N° de máquina y N° de ciclo deben ser números enteros.' });
+    }
     try {
         const result = await db.query(`
             SELECT c.id, c.numero_maquina, c.numero_ciclo, c.metodo, c.temperatura, c.presion, c.tiempo_minutos,

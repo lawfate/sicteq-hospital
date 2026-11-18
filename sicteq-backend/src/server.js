@@ -29,6 +29,20 @@ const ORIGENES = (process.env.CORS_ORIGINS || 'https://sicteq-hospital.dhiegho12
 // Render está detrás de un proxy: así req.ip es la IP real del cliente (auditoría).
 app.set('trust proxy', 1);
 
+// Cabeceras de seguridad (revisión OWASP, PB-08). no-store: las respuestas traen
+// datos de pacientes y no deben quedar en cachés del navegador ni de proxies.
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+    res.set({
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'no-referrer',
+        'Strict-Transport-Security': 'max-age=31536000',
+        'Cache-Control': 'no-store',
+    });
+    next();
+});
+
 // Middlewares
 app.use(cors({
     origin: ORIGENES,
@@ -63,6 +77,15 @@ app.get('/api/health', (req, res) => {
         mensaje: 'Servidor SICTEQ-Hospital funcionando correctamente',
         timestamp: new Date()
     });
+});
+
+// Errores que no atrapó ningún controlador (JSON mal formado, petición muy
+// grande...). Sin esto Express responde una página HTML con el stack trace.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    const status = err.status || err.statusCode || 500;
+    if (status >= 500) console.error('Error no controlado:', err);
+    res.status(status).json({ error: status === 413 ? 'La petición es demasiado grande.' : status < 500 ? 'Petición mal formada.' : 'Error interno del servidor' });
 });
 
 // Inicio del Servidor

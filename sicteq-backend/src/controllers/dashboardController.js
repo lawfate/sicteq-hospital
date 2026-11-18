@@ -62,7 +62,7 @@ const getDashboardData = async (req, res) => {
         });
     } catch (err) {
         console.error("Error en dashboard:", err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: "Error interno del servidor" });
     }
 };
 
