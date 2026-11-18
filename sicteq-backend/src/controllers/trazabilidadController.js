@@ -60,6 +60,10 @@ const actualizarEtapa = async (req, res) => {
     if (!codigo || stage === undefined) {
         return res.status(400).json({ error: "Datos incompletos: se requiere codigo y stage." });
     }
+    // Antes se aceptaba cualquier valor y se guardaba tal cual como estado (ej. "Etapa 99").
+    if (!Number.isInteger(Number(stage)) || Number(stage) < 1 || Number(stage) > 6) {
+        return res.status(400).json({ error: "Etapa inválida: debe ser un número del 1 al 6." });
+    }
 
     try {
         const cajaResult = await db.query(
@@ -111,7 +115,7 @@ const actualizarEtapa = async (req, res) => {
         }
 
         // Formatear el estado y la justificación
-        const estadoFormateado = typeof stage === 'string' ? stage : `Etapa ${stage}`;
+        const estadoFormateado = `Etapa ${etapaNueva}`;
         const justificacionFinal = (reason || '').trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
 
         // Los parámetros del ciclo de esterilización (método/temperatura/presión/

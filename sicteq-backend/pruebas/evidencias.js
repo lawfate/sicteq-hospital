@@ -11,7 +11,8 @@ const fs = require('fs');
 const { Pool } = require('pg');
 
 const API = process.env.API_URL || 'http://localhost:4000';
-if (!process.argv.includes('--confirmo-base-de-pruebas')) {
+// Además del flag, el host: con el .env normal DATABASE_URL apunta a producción.
+if (!process.argv.includes('--confirmo-base-de-pruebas') || !new URL(process.env.DATABASE_URL).host.startsWith('ep-odd-art')) {
     console.error('Este script escribe datos. Agrega --confirmo-base-de-pruebas si DATABASE_URL es la rama de pruebas.');
     console.error('DATABASE_URL apunta a:', new URL(process.env.DATABASE_URL).host);
     process.exit(1);
