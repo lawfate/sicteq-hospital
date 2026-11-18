@@ -90,7 +90,7 @@ const FUGA = /syntax|invalid input|relation|column|pg_|sql|stack|at \w+ \(/i;
     const d = await api('GET', '/api/dashboard', it);
     control('A05', 'Respuestas con datos de pacientes no se guardan en caché', d.headers.get('cache-control') === 'no-store', `cache-control: ${d.headers.get('cache-control')}`);
     const malas = [await api('GET', '/api/reportes/trazabilidad?desde=no-es-fecha', it), await api('GET', '/api/solicitudes?area_id=abc', it), await api('POST', '/api/auth/login', null, '{json roto')];
-    control('A05', 'Errores provocados no muestran detalles de la base de datos', malas.every(r => !FUGA.test(r.texto)), malas.map(r => `${r.status} ${r.texto.slice(0, 60)}`).join(' | '));
+    control('A05', 'Filtros o JSON inválidos: 400 sin detalles de la base de datos', malas.every(r => r.status === 400 && !FUGA.test(r.texto)), malas.map(r => `${r.status} ${r.texto.slice(0, 60)}`).join(' | '));
     const cors = (await api('GET', '/api/health', null, undefined, { Origin: 'https://sitio-ajeno.example' })).headers.get('access-control-allow-origin');
     control('A05', 'CORS no autoriza sitios ajenos', !cors, `access-control-allow-origin: ${cors || '(ninguno)'}`);
 

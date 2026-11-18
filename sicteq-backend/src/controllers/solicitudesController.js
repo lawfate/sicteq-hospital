@@ -3,6 +3,9 @@ const { registrarAuditoria } = require('../utils/auditoria');
 
 const nullable = (v) => (v === undefined || v === '' ? null : v);
 
+// Filtros que Postgres no puede convertir: 400 en vez de un error 500.
+const filtroInvalido = (fechas, enteros = []) => fechas.some(v => v !== null && Number.isNaN(Date.parse(v))) || enteros.some(v => v !== null && !/^\d+$/.test(v));
+
 // GET: Listado completo de solicitudes, filtrable por área/estado/fecha. No
 // existía ningún endpoint para esto -- la única vista era el bloque
 // "críticas" del dashboard (solo pendientes, máximo 5).
@@ -11,6 +14,9 @@ const getSolicitudes = async (req, res) => {
     const estado = nullable(req.query.estado);
     const desde = nullable(req.query.desde);
     const hasta = nullable(req.query.hasta);
+    if (filtroInvalido([desde, hasta], [areaId])) {
+        return res.status(400).json({ error: 'Filtro inválido: revise las fechas y el área.' });
+    }
 
     try {
         const result = await db.query(`
