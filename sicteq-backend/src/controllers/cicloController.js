@@ -8,6 +8,10 @@ const { registrarAuditoria } = require('../utils/auditoria');
 
 const ESTERILIZACION_STAGE = 'Etapa 4';
 const LAVADO_STAGE = 'Etapa 2';
+const ETAPAS_PARA_CARGAR = [LAVADO_STAGE, 'Etapa 3'];
+const NOMBRES_ETAPA = { 'Etapa 1': 'Recepción', 'Etapa 2': 'Lavado', 'Etapa 3': 'Preparación', 'Etapa 4': 'Esterilización',
+    'Etapa 5': 'Almacenamiento', 'Etapa 6': 'Entrega', Despachado: 'Despachada a pabellón' };
+const nombreEtapa = (e) => NOMBRES_ETAPA[e] || e || 'sin movimientos';
 const RESULTADOS = ['Estéril', 'No estéril'];
 const etiqueta = (c) => `M${c.numero_maquina}-C${c.numero_ciclo}`;
 
@@ -80,13 +84,25 @@ const crearCiclo = async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        const cajas = await client.query(
-            'SELECT id, inventario_id, codigo_caja FROM caja_fisica WHERE codigo_caja = ANY($1::text[])', [codigos]);
+        const cajas = await client.query(`
+            SELECT cf.id, cf.inventario_id, cf.codigo_caja,
+                   (SELECT h.estado_nuevo FROM historial_movimiento h WHERE h.caja_fisica_id = cf.id
+                     ORDER BY h.fecha_cambio DESC, h.id DESC LIMIT 1) AS etapa
+            FROM caja_fisica cf WHERE cf.codigo_caja = ANY($1::text[])`, [codigos]);
         const encontradas = new Set(cajas.rows.map(r => r.codigo_caja));
         const faltantes = codigos.filter(c => !encontradas.has(c));
         if (faltantes.length) {
             await client.query('ROLLBACK');
             return res.status(404).json({ error: `Cajas no encontradas: ${faltantes.join(', ')}` });
+        }
+        // Decisión de Diego (18-11): al autoclave solo entran cajas lavadas o en
+        // preparación; una caja en pabellón, en bodega o ya en otra carga, no.
+        const fueraDeEtapa = cajas.rows.filter(r => !ETAPAS_PARA_CARGAR.includes(r.etapa));
+        if (fueraDeEtapa.length) {
+            await client.query('ROLLBACK');
+            await registrarAuditoria(req, 'carga_bloqueada', 'ciclo_esterilizacion', `M${numero_maquina}-C${numero_ciclo}`,
+                { cajas: fueraDeEtapa.map(r => ({ caja: r.codigo_caja, etapa: r.etapa })) });
+            return res.status(409).json({ error: `Solo se cargan cajas en Lavado o Preparación. No corresponde: ${fueraDeEtapa.map(r => `${r.codigo_caja} (${nombreEtapa(r.etapa)})`).join(', ')}` });
         }
 
         const ciclo = await client.query(`

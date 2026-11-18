@@ -71,17 +71,21 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
     check('PB-02', 'TENS no puede vincular caja a paciente', 403, r.status, r.json);
 
     // ---------------- PB-04 / PB-05: carga de autoclave ----------------
-    const cajas = (await db.query(`SELECT id, codigo_caja FROM caja_fisica WHERE estado = 'En circulación' ORDER BY id LIMIT 2`)).rows;
-    if (cajas.length < 2) throw new Error('Se necesitan al menos 2 cajas físicas en circulación en la base de pruebas.');
-    const [c1, c2] = cajas;
+    const cajas = (await db.query(`SELECT id, codigo_caja FROM caja_fisica WHERE estado = 'En circulación' ORDER BY id LIMIT 3`)).rows;
+    if (cajas.length < 3) throw new Error('Se necesitan al menos 3 cajas físicas en circulación en la base de pruebas.');
+    const [c1, c2, c3] = cajas;
     const numCiclo = Number(String(Date.now()).slice(-6));
     const params = { metodo: 'Autoclave', temperatura: 134, presion: '2.1 bar', tiempo_minutos: 18 };
+    // Al autoclave solo entran cajas en Lavado o Preparación: se dejan en Preparación.
+    for (const c of cajas) await api('POST', '/api/trazabilidad/actualizar', tens, { codigo: c.codigo_caja, stage: 3, reason: 'Prueba: caja preparada para la carga' });
 
     r = await api('POST', '/api/ciclos', tens, { numero_maquina: 2, numero_ciclo: numCiclo, ...params, cajas: [c1.codigo_caja, c2.codigo_caja] });
     check('PB-04', `TENS registra la carga M2-C${numCiclo} con 2 cajas`, 201, r.status, r.json.identificador);
     const ciclo1 = r.json.id;
-    r = await api('POST', '/api/ciclos', tens, { numero_maquina: 2, numero_ciclo: numCiclo, cajas: [c1.codigo_caja] });
-    check('PB-04', 'No se puede repetir el identificador de carga', 409, r.status, r.json);
+    r = await api('POST', '/api/ciclos', tens, { numero_maquina: 2, numero_ciclo: numCiclo, cajas: [c3.codigo_caja] });
+    check('PB-04', 'No se puede repetir el identificador de carga', '409 repetido', `${r.status} ${/Ya existe/.test(r.json.error) ? 'repetido' : r.json.error}`, r.json);
+    r = await api('POST', '/api/ciclos', tens, { numero_maquina: 2, numero_ciclo: numCiclo + 5, cajas: [c1.codigo_caja] });
+    check('PB-04', 'Una caja que ya está en Esterilización no entra a otra carga', '409 etapa', `${r.status} ${/Lavado o Preparación/.test(r.json.error) ? 'etapa' : r.json.error}`, r.json);
     r = await api('GET', `/api/ciclos?maquina=2&numero=${numCiclo}`, tens);
     check('PB-04', 'Se consulta la carga por su identificador (como el voucher)', 1, Array.isArray(r.json) ? r.json.length : 0, resumen(r.json[0]));
 
@@ -160,7 +164,7 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
     r = await api('GET', `/api/auditoria?desde=${encodeURIComponent(inicio.toISOString())}&limite=500`, it);
     check('PB-01', 'IT consulta la auditoría', 200, r.status, '');
     const acciones = new Set((Array.isArray(r.json) ? r.json : []).map(a => a.accion));
-    for (const a of ['login', 'crear_ciclo', 'resultado_ciclo', 'etapa_bloqueada', 'cambio_etapa', 'consulta_ficha_paciente', 'vinculo_caja_paciente', 'despacho_bloqueado', 'despachar_solicitud', 'cuenta_bloqueada']) {
+    for (const a of ['login', 'crear_ciclo', 'resultado_ciclo', 'etapa_bloqueada', 'cambio_etapa', 'consulta_ficha_paciente', 'vinculo_caja_paciente', 'despacho_bloqueado', 'despachar_solicitud', 'cuenta_bloqueada', 'carga_bloqueada']) {
         check('PB-01', `Queda registrada la acción "${a}"`, true, acciones.has(a), '');
     }
     const muestra = (Array.isArray(r.json) ? r.json : []).slice(0, 12);

@@ -86,6 +86,7 @@ const msg = (j) => (typeof j === 'string' ? j : (j.error || j.message || JSON.st
     const caja = (await db.query(`SELECT cf.id, cf.codigo_caja, cf.inventario_id FROM caja_fisica cf
         WHERE cf.estado = 'En circulación' ORDER BY random() LIMIT 1`)).rows[0];
     const numCiclo = 900000 + Number(String(Date.now()).slice(-5));
+    await api('POST', '/api/trazabilidad/actualizar', tens, { codigo: caja.codigo_caja, stage: 3, reason: 'CP-07: caja preparada para la carga' });
     r = await api('POST', '/api/ciclos', tens, { numero_maquina: 3, numero_ciclo: numCiclo, metodo: 'Autoclave', temperatura: 134, presion: '2.1 bar', tiempo_minutos: 18, cajas: [caja.codigo_caja] });
     const ciclo = r.json.id;
     await api('PUT', `/api/ciclos/${ciclo}/resultado`, enf, { resultado: 'Estéril' });
