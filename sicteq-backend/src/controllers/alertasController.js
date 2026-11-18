@@ -14,7 +14,8 @@ const getAlertas = async (req, res) => {
 
         const cajasPorVencer = await db.query(`
             SELECT cf.id, cf.codigo_caja, cf.fecha_caducidad, i.nombre_equipo,
-                   (cf.fecha_caducidad::date - CURRENT_DATE) AS dias_restantes
+                   ((cf.fecha_caducidad AT TIME ZONE 'UTC' AT TIME ZONE 'America/Santiago')::date
+                    - (NOW() AT TIME ZONE 'America/Santiago')::date) AS dias_restantes
             FROM caja_fisica cf
             JOIN inventario i ON cf.inventario_id = i.id
             WHERE cf.estado = 'En circulación'

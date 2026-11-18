@@ -55,6 +55,9 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
                 <Link to="/autoclave" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/autoclave')}`}>
                     <i className="fa-solid fa-temperature-high text-lg w-5"></i> Cargas de Autoclave
                 </Link>
+                <Link to="/etiquetas" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/etiquetas')}`}>
+                    <i className="fa-solid fa-tags text-lg w-5"></i> Etiquetas de Cajas
+                </Link>
                 <Link to="/vinculo" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/vinculo')}`}>
                     <i className="fa-solid fa-link text-lg w-5"></i> Vínculo Clínico
                 </Link>

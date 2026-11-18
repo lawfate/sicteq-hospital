@@ -13,6 +13,7 @@ import Reportes from './components/Reportes'
 import Autoclave from './components/Autoclave'
 import Auditoria from './components/Auditoria'
 import Indicadores from './components/Indicadores'
+import Etiquetas from './components/Etiquetas'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -129,6 +130,7 @@ function App() {
                 <Route path="/autoclave" element={<Autoclave user={user} />} />
                 <Route path="/auditoria" element={<Auditoria user={user} />} />
                 <Route path="/indicadores" element={<Indicadores />} />
+                <Route path="/etiquetas" element={<Etiquetas />} />
               </Routes>
           </main>
         </div>

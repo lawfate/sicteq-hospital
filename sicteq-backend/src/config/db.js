@@ -1,5 +1,10 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 require('dotenv').config();
+
+// Las columnas son TIMESTAMP sin zona y se llenan con NOW() de Neon (UTC).
+// Sin esto, pg las lee como hora local del servidor: en un PC en Chile salían
+// 3 h adelantadas. 1114 = TIMESTAMP WITHOUT TIME ZONE.
+types.setTypeParser(1114, (s) => new Date(s.replace(' ', 'T') + 'Z'));
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,

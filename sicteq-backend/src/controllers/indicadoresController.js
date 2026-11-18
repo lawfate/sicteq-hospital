@@ -82,7 +82,7 @@ const getIndicadores = async (req, res) => {
               AND a.fecha_cambio - r.fecha < INTERVAL '3 days'`, [dias]);
 
         const porDia = db.query(`
-            SELECT TO_CHAR(DATE_TRUNC('day', fecha_cambio), 'YYYY-MM-DD') AS dia, COUNT(*)::int AS despachos
+            SELECT TO_CHAR(DATE_TRUNC('day', fecha_cambio AT TIME ZONE 'UTC' AT TIME ZONE 'America/Santiago'), 'YYYY-MM-DD') AS dia, COUNT(*)::int AS despachos
             FROM historial_movimiento
             WHERE estado_nuevo = 'Despachado' AND fecha_cambio >= NOW() - make_interval(days => $1)
             GROUP BY 1 ORDER BY 1`, [dias]);
