@@ -10,8 +10,12 @@ export const apiFetch = (path, options = {}) => {
   const headers = { ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  return fetch(`${API_URL}${path}`, { ...options, headers }).then((res) => {
+  return fetch(`${API_URL}${path}`, { ...options, headers }).then(async (res) => {
     if (res.status === 401) {
+      // El backend explica por qué se cerró (inactividad, sesión en otro equipo...);
+      // Login.jsx lo muestra al volver.
+      const data = await res.clone().json().catch(() => ({}));
+      if (data.error) sessionStorage.setItem('sicteq_motivo_salida', data.error);
       localStorage.removeItem('sicteq_token');
       localStorage.removeItem('sicteq_user');
       window.location.reload();

@@ -4,6 +4,9 @@ const db = require('../config/db');
 // funcionen con el patrón "$1::tipo IS NULL OR columna = $1" sin condicionales.
 const nullable = (v) => (v === undefined || v === '' ? null : v);
 
+// Filtros que Postgres no puede convertir: 400 en vez de un error 500.
+const filtroInvalido = (fechas, enteros = []) => fechas.some(v => v !== null && Number.isNaN(Date.parse(v))) || enteros.some(v => v !== null && !/^\d+$/.test(v));
+
 // Reporte de trazabilidad: historial de movimientos filtrable por caja física
 // y rango de fechas -- el ciclo completo de cada caja, no solo los últimos 5
 // que muestra el Dashboard.
@@ -11,6 +14,9 @@ const getReporteTrazabilidad = async (req, res) => {
     const codigo = nullable(req.query.codigo ? String(req.query.codigo).trim().toUpperCase() : undefined);
     const desde = nullable(req.query.desde);
     const hasta = nullable(req.query.hasta);
+    if (filtroInvalido([desde, hasta])) {
+        return res.status(400).json({ error: 'Filtro inválido: revise las fechas.' });
+    }
 
     try {
         const result = await db.query(`
@@ -41,6 +47,9 @@ const getReporteVinculos = async (req, res) => {
     const codigo = nullable(req.query.codigo ? String(req.query.codigo).trim().toUpperCase() : undefined);
     const desde = nullable(req.query.desde);
     const hasta = nullable(req.query.hasta);
+    if (filtroInvalido([desde, hasta])) {
+        return res.status(400).json({ error: 'Filtro inválido: revise las fechas.' });
+    }
 
     try {
         const result = await db.query(`

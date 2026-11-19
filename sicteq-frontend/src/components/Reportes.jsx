@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
+import { toCSV } from '../csv';
 
 const TABS = [
   { id: 'trazabilidad', label: 'Trazabilidad', icon: 'fa-route' },
@@ -15,17 +16,6 @@ const fmt = (dateString) => {
   return new Date(dateString).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-const toCSV = (rows, columns) => {
-  const header = columns.map(c => `"${c.label}"`).join(',');
-  const lines = rows.map(row =>
-    columns.map(c => {
-      const v = row[c.key];
-      const s = v === null || v === undefined ? '' : String(v);
-      return `"${s.replace(/"/g, '""')}"`;
-    }).join(',')
-  );
-  return [header, ...lines].join('\n');
-};
 
 const downloadCSV = (filename, rows, columns) => {
   const csv = toCSV(rows, columns);

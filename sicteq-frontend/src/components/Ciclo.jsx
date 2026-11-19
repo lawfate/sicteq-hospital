@@ -6,6 +6,8 @@ import { apiFetch } from '../api';
 // area_destino_id NO sirve para esto: esa columna referencia el pabellón/área
 // física de destino (tabla AREA), un concepto distinto de la etapa del ciclo.
 const parseStage = (estadoNuevo) => {
+  // El despacho a pabellón se registra como "Despachado": equivale a Entrega.
+  if (/despachad/i.test(String(estadoNuevo || ''))) return 6;
   const match = String(estadoNuevo || '').match(/Etapa\s*(\d+)/i);
   return match ? parseInt(match[1], 10) : 1;
 };
@@ -36,7 +38,7 @@ export default function Ciclo() {
   const [temperatura, setTemperatura] = useState("");
   const [presion, setPresion] = useState("");
   const [tiempoMinutos, setTiempoMinutos] = useState("");
-  const [vigenciaDias, setVigenciaDias] = useState("30");
+  const [vigenciaDias, setVigenciaDias] = useState("365");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const steps = [
@@ -155,7 +157,7 @@ export default function Ciclo() {
       setTemperatura("");
       setPresion("");
       setTiempoMinutos("");
-      setVigenciaDias("30");
+      setVigenciaDias("365");
       setIsModalOpen(false);
       alert("Etapa actualizada con éxito");
 
@@ -184,7 +186,11 @@ export default function Ciclo() {
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value.toUpperCase())}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="Ej: CAJA-0045"
+                  // PB-06: listo para la pistola apenas se abre la pantalla; al volver
+                  // a enfocarlo se selecciona el texto, así el siguiente escaneo lo reemplaza.
+                  autoFocus
+                  onFocus={(e) => e.target.select()}
+                  placeholder="Escanee o escriba: CAJA-0045"
                   className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50 uppercase tracking-wider"
                 />
                 <button onClick={handleSearch} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm hover:bg-slate-800">Buscar</button>
@@ -286,7 +292,7 @@ export default function Ciclo() {
                       {targetStage === 5 && (
                           <div className="flex flex-col gap-1 pt-1 border-t border-sky-100">
                               <label className="text-[11px] font-bold text-slate-500 uppercase">Vigencia del empaque (días)</label>
-                              <input type="number" min="1" className="w-32 p-2 rounded text-sm border border-slate-300" value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} placeholder="30" />
+                              <input type="number" min="1" className="w-32 p-2 rounded text-sm border border-slate-300" value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} placeholder="365" />
                               <p className="text-[11px] text-sky-700">Desde hoy se calcula la fecha de caducidad del empaque estéril.</p>
                           </div>
                       )}

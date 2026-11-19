@@ -1,11 +1,13 @@
 const db = require('../config/db');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 // Crea el vínculo real caja física <-> paciente (reemplaza el alert()
 // que antes simulaba esta acción sin guardar nada).
 const crearVinculo = async (req, res) => {
     const rut = String(req.body.rut || '').trim();
     const codigo_caja = String(req.body.codigo_caja || '').trim().toUpperCase();
-    const usuario_id = req.body.usuario_id || null;
+    // El usuario sale del token, no del body: antes se podía firmar a nombre de otro.
+    const usuario_id = req.user.id;
 
     if (!rut || !codigo_caja) {
         return res.status(400).json({ error: "Se requiere rut y codigo_caja" });
@@ -31,6 +33,7 @@ const crearVinculo = async (req, res) => {
             [caja_fisica_id, paciente_id, usuario_id]
         );
 
+        await registrarAuditoria(req, 'vinculo_caja_paciente', 'caja_fisica', codigo_caja, { paciente_rut: rut });
         res.json({
             success: true,
             message: `Caja "${codigo_caja}" vinculada a la ficha clínica de ${pacienteRes.rows[0].nombre}.`

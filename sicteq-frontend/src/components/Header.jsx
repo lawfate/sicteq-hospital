@@ -8,7 +8,11 @@ export default function Header({ onMenuClick }) {
     '/solicitudes': 'Solicitudes desde Pabellón',
     '/ciclo': 'Ciclo de Trazabilidad Activo',
     '/vinculo': 'Vínculo Clínico de Pacientes',
-    '/inventario': 'Inventario y Mermas'
+    '/inventario': 'Inventario y Mermas',
+    '/reportes': 'Reportes de Gestión',
+    '/autoclave': 'Cargas de Autoclave',
+    '/auditoria': 'Auditoría',
+    '/indicadores': 'Indicadores de Gestión'
   };
 
   return (
