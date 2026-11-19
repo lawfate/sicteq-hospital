@@ -32,12 +32,12 @@ const downloadCSV = (filename, rows, columns) => {
 
 function FilterBar({ children, onApply, loading }) {
   return (
-    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-end gap-3">
+    <div className="bg-card p-4 rounded-lg border border-border flex flex-wrap items-end gap-3">
       {children}
       <button
         onClick={onApply}
         disabled={loading}
-        className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 disabled:opacity-50"
+        className="bg-foreground text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold hover:bg-foreground disabled:opacity-50"
       >
         {loading ? 'Cargando...' : 'Aplicar filtros'}
       </button>
@@ -48,37 +48,37 @@ function FilterBar({ children, onApply, loading }) {
 function Field({ label, children }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[11px] font-bold text-slate-500 uppercase">{label}</label>
+      <label className="text-[11px] font-bold text-muted-foreground uppercase">{label}</label>
       {children}
     </div>
   );
 }
 
-const inputCls = "p-2 border border-slate-300 rounded-lg text-sm";
+const inputCls = "p-2 border border-border rounded-lg text-sm";
 
 function ReportTable({ columns, rows, emptyMessage, onExport }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-        <h3 className="font-bold text-slate-800 text-sm">{rows.length} resultado{rows.length === 1 ? '' : 's'}</h3>
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-muted/40">
+        <h3 className="font-bold text-foreground text-sm">{rows.length} resultado{rows.length === 1 ? '' : 's'}</h3>
         <button
           onClick={onExport}
           disabled={rows.length === 0}
-          className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 disabled:opacity-40 flex items-center gap-2"
+          className="bg-ok text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-ok/90 disabled:opacity-40 flex items-center gap-2"
         >
           <i className="fa-solid fa-file-csv"></i> Exportar CSV
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-slate-600 min-w-[720px]">
-          <thead className="text-xs uppercase tracking-wider text-slate-400 border-b bg-white">
+        <table className="w-full text-left text-sm text-muted-foreground min-w-[720px]">
+          <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b bg-card">
             <tr>
               {columns.map(c => <th key={c.key} className="px-6 py-3 whitespace-nowrap">{c.label}</th>)}
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => (
-              <tr key={row.id ?? idx} className="border-b border-slate-100 hover:bg-slate-50">
+              <tr key={row.id ?? idx} className="border-b border-border hover:bg-muted/40">
                 {columns.map(c => (
                   <td key={c.key} className="px-6 py-3 whitespace-nowrap">{c.render ? c.render(row) : (row[c.key] ?? '—')}</td>
                 ))}
@@ -86,7 +86,7 @@ function ReportTable({ columns, rows, emptyMessage, onExport }) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-8 text-center text-slate-400">{emptyMessage}</td>
+                <td colSpan={columns.length} className="px-6 py-8 text-center text-muted-foreground">{emptyMessage}</td>
               </tr>
             )}
           </tbody>
@@ -266,12 +266,12 @@ function ReporteAlertas() {
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <button onClick={load} disabled={loading} className="text-sm font-bold text-slate-500 hover:text-sky-600 flex items-center gap-2">
+        <button onClick={load} disabled={loading} className="text-sm font-bold text-muted-foreground hover:text-primary flex items-center gap-2">
           <i className={`fa-solid fa-arrows-rotate ${loading ? 'animate-spin' : ''}`}></i> Actualizar
         </button>
       </div>
       <div>
-        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Stock bajo o en alerta</h4>
+        <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">Stock bajo o en alerta</h4>
         <ReportTable
           columns={colsStock}
           rows={stockBajo}
@@ -280,7 +280,7 @@ function ReporteAlertas() {
         />
       </div>
       <div>
-        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Empaque por vencer</h4>
+        <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">Empaque por vencer</h4>
         <ReportTable
           columns={colsVencer}
           rows={cajasPorVencer}
@@ -359,8 +359,8 @@ export default function Reportes() {
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">Reportes de Gestión</h2>
-        <p className="text-slate-500 text-sm">Trazabilidad, solicitudes, alertas y vínculos clínicos, filtrables y exportables a CSV.</p>
+        <h2 className="text-2xl font-bold text-foreground">Reportes de Gestión</h2>
+        <p className="text-muted-foreground text-sm">Trazabilidad, solicitudes, alertas y vínculos clínicos, filtrables y exportables a CSV.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -369,7 +369,7 @@ export default function Reportes() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-              tab === t.id ? 'bg-sky-600 text-white' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+              tab === t.id ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground border border-border hover:bg-muted/40'
             }`}
           >
             <i className={`fa-solid ${t.icon}`}></i> {t.label}

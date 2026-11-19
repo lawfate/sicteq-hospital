@@ -10,7 +10,7 @@ const ESTERILIZACION_STAGE = 'Etapa 4';
 const LAVADO_STAGE = 'Etapa 2';
 const ETAPAS_PARA_CARGAR = [LAVADO_STAGE, 'Etapa 3'];
 const NOMBRES_ETAPA = { 'Etapa 1': 'Recepción', 'Etapa 2': 'Lavado', 'Etapa 3': 'Preparación', 'Etapa 4': 'Esterilización',
-    'Etapa 5': 'Almacenamiento', 'Etapa 6': 'Entrega', Despachado: 'Despachada a pabellón' };
+    'Etapa 5': 'Bodega estéril', 'Etapa 6': 'Entrega', Despachado: 'En pabellón' };
 const nombreEtapa = (e) => NOMBRES_ETAPA[e] || e || 'sin movimientos';
 const RESULTADOS = ['Estéril', 'No estéril'];
 const etiqueta = (c) => `M${c.numero_maquina}-C${c.numero_ciclo}`;

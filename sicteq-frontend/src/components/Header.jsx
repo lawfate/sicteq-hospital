@@ -1,44 +1,32 @@
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { pantallaDe } from '@/navegacion';
+import { Button } from '@/components/ui/button';
+
+const reloj = () => new Date().toLocaleString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export default function Header({ onMenuClick }) {
-  const location = useLocation();
-  
-  const titles = {
-    '/': 'Dashboard Central',
-    '/solicitudes': 'Solicitudes desde Pabellón',
-    '/ciclo': 'Ciclo de Trazabilidad Activo',
-    '/vinculo': 'Vínculo Clínico de Pacientes',
-    '/inventario': 'Inventario y Mermas',
-    '/reportes': 'Reportes de Gestión',
-    '/autoclave': 'Cargas de Autoclave',
-    '/auditoria': 'Auditoría',
-    '/indicadores': 'Indicadores de Gestión'
-  };
+  const { pathname } = useLocation();
+  const pantalla = pantallaDe(pathname);
+  // La Central trabaja por turnos: la hora siempre visible ayuda a registrar a tiempo.
+  const [ahora, setAhora] = useState(reloj);
+  useEffect(() => {
+    const t = setInterval(() => setAhora(reloj()), 30 * 1000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 shadow-sm shrink-0">
-        <div className="flex items-center gap-3">
-            {/* Botón Hamburguesa - Solo visible en móviles */}
-            <button 
-                onClick={onMenuClick}
-                className="md:hidden w-10 h-10 flex items-center justify-center text-slate-500 hover:text-sky-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-                <i className="fa-solid fa-bars text-lg"></i>
-            </button>
-
-            {/* Título de Ubicación */}
-            <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-500 hidden sm:inline">Ubicación:</span>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-full truncate max-w-[150px] sm:max-w-none">
-                    {titles[location.pathname] || 'SICTEQ'}
-                </span>
-            </div>
+    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/60 px-4 md:px-8">
+      <div className="flex min-w-0 items-center gap-3">
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick} aria-label="Abrir menú">
+          <i className="fa-solid fa-bars text-lg" aria-hidden="true"></i>
+        </Button>
+        <div className="min-w-0 leading-tight">
+          <p className="truncate text-lg font-bold">{pantalla?.nombre || 'SICTEQ'}</p>
+          {pantalla?.ayuda && <p className="hidden truncate text-xs text-muted-foreground sm:block">{pantalla.ayuda}</p>}
         </div>
-        
-        {/* Etiqueta del Hospital */}
-        <div className="hidden sm:block text-xs text-slate-400 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
-            Hospital Dr. Franco Ravera Zunino • Red Asistencial
-        </div>
+      </div>
+      <p className="hidden shrink-0 font-mono text-sm text-muted-foreground sm:block">{ahora}</p>
     </header>
   );
 }
