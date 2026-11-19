@@ -14,10 +14,12 @@ import Autoclave from './components/Autoclave'
 import Auditoria from './components/Auditoria'
 import Indicadores from './components/Indicadores'
 import Etiquetas from './components/Etiquetas'
+import { Button } from '@/components/ui/button'
 
 function App() {
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [menuAbierto, setMenuAbierto] = useState(false); // menú lateral en pantallas chicas
 
   // Antes la sesión vivía solo en useState: un F5, o abrir un link en
   // pestaña nueva, botaba al login sin ninguna razón real. El token y el
@@ -103,19 +105,18 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="bg-slate-100 font-sans text-slate-800 flex h-screen overflow-hidden">
-        {/* Pasamos el usuario dinámico y la función de logout */}
-        <Sidebar onLogout={handleLogout} user={user} />
-        
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex h-full overflow-hidden bg-background text-foreground">
+        <Sidebar onLogout={handleLogout} user={user} isOpen={menuAbierto} setIsOpen={setMenuAbierto} />
+
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {avisoInactividad && (
-            <div role="alert" className="bg-amber-100 border-b border-amber-300 text-amber-800 text-sm font-medium px-6 py-3 flex items-center justify-between gap-4">
-              <span><i className="fa-solid fa-clock mr-2"></i>Tu sesión se cerrará en 5 minutos por inactividad.</span>
-              <button onClick={seguirConectado} className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-1.5 rounded-lg">Seguir conectado</button>
+            <div role="alert" className="flex items-center justify-between gap-4 border-b border-warn/40 bg-warn/15 px-6 py-3 text-sm font-bold text-warn">
+              <span><i className="fa-solid fa-clock mr-2" aria-hidden="true"></i>Tu sesión se cerrará en 5 minutos por inactividad.</span>
+              <Button size="sm" onClick={seguirConectado} className="bg-warn text-primary-foreground hover:bg-warn/90">Seguir conectado</Button>
             </div>
           )}
-          <Header />
-          <main className="flex-1 overflow-y-auto p-6">
+          <Header onMenuClick={() => setMenuAbierto(true)} />
+          <main className="flex-1 overflow-y-auto p-4 md:p-8">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 

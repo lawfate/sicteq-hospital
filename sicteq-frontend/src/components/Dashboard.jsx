@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // <-- NUEVO: Para navegar a la vista de Vínculo
+import { useNavigate } from 'react-router-dom';
 import Modal from './Modal';
 import { apiFetch } from '../api';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { nombreEstado, varianteEstado } from '@/etapas';
+
+// Las solicitudes guardan "[Instrumental Requerido: Set X] - nota": se muestra solo el set.
+const cajaPedida = (texto) => String(texto || '').match(/\[Instrumental Requerido:\s*([^\]]+)\]/)?.[1] || texto || '—';
+
+const fecha = (d) => new Date(d).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -16,12 +26,14 @@ export default function Dashboard() {
   const [showCajasCirculacion, setShowCajasCirculacion] = useState(false);
   // null = todavía cargando (antes mostraba "Sin alertas" mientras llegaba la respuesta).
   const [alertas, setAlertas] = useState(null);
+  const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     apiFetch(`/api/dashboard`)
       .then(res => res.json())
       .then(json => setData(json))
-      .catch(err => console.error("Error cargando dashboard:", err));
+      .catch(err => console.error("Error cargando dashboard:", err))
+      .finally(() => setCargando(false));
 
     apiFetch(`/api/cajas/circulacion`)
       .then(res => res.json())
@@ -49,269 +61,210 @@ export default function Dashboard() {
         return;
       }
       const response = await apiFetch(`/api/dashboard/movimientos/${mov.inventario_id}`);
-      const data = await response.json();
-      setModalContent({
-        title: `Historial: ${mov.justificacion}`,
-        items: data
-      });
+      const historial = await response.json();
+      setModalContent({ title: `Historial: ${mov.justificacion}`, items: historial });
       setIsModalOpen(true);
     } catch (error) {
       console.error("Error al cargar historial:", error);
     }
   };
 
-  // NUEVO: Función para llevar al TENS a vincular la caja
-  const handleVincular = (solicitud_id) => {
-    // Navegamos a la ruta /vinculo y le pasamos el ID de la solicitud por la URL
-    navigate(`/vinculo?solicitud=${solicitud_id}`);
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  };
+  const resumen = [
+    { titulo: 'En proceso', valor: data.stats.en_proceso, nota: 'Recepción a esterilización' },
+    { titulo: 'Listas o en pabellón', valor: data.stats.total_equipos, nota: 'En bodega estéril o entregadas' },
+    { titulo: 'Pedidos pendientes', valor: data.stats.solicitudes_pendientes, nota: 'Por preparar para pabellón', alerta: data.stats.solicitudes_pendientes > 0 },
+    { titulo: 'Stock en alerta', valor: data.stats.alertas_stock, nota: 'Tipos de caja bajo el mínimo', alerta: data.stats.alertas_stock > 0 },
+  ];
+  const hayAlertas = alertas && (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0);
 
   return (
-    <div className="space-y-6">
-      {/* Resumen de Esterilización */}
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">Resumen de Esterilización</h2>
-        <p className="text-slate-500 text-sm mt-1">Métricas en tiempo real del ciclo quirúrgico.</p>
-      </div>
-
-      {/* TARJETAS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { title: 'Cajas en Proceso', val: data.stats.en_proceso, color: 'blue', icon: 'fa-boxes-stacked' },
-          { title: 'Listas / Despachadas', val: data.stats.total_equipos, color: 'emerald', icon: 'fa-check-double' },
-          { title: 'Alertas de Merma', val: data.stats.alertas_stock, color: 'amber', icon: 'fa-triangle-exclamation' },
-          { title: 'Solicitudes Pabellón', val: data.stats.solicitudes_pendientes, color: 'purple', icon: 'fa-clipboard-list' }
-        ].map((card, i) => (
-          <div key={i} className="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full bg-${card.color}-100 flex items-center justify-center text-${card.color}-600 text-xl`}>
-              <i className={`fa-solid ${card.icon}`}></i>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">{card.title}</p>
-              <p className="text-2xl font-bold text-slate-800">{card.val || 0}</p>
-            </div>
+    <div className="mx-auto max-w-7xl space-y-8">
+      {/* Resumen: cuatro números, sin adornos, legibles a distancia */}
+      <section aria-label="Resumen" className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card lg:grid-cols-4">
+        {resumen.map((r, i) => (
+          <div key={r.titulo} className={`space-y-1 p-5 ${i > 0 ? 'border-l border-border' : ''} ${i === 2 ? 'max-lg:border-l-0 max-lg:border-t' : ''} ${i === 3 ? 'max-lg:border-t' : ''}`}>
+            <p className="text-sm font-bold text-muted-foreground">{r.titulo}</p>
+            <p className={`font-mono text-4xl font-bold tabular-nums ${r.alerta ? 'text-warn' : ''}`}>{cargando ? '–' : (r.valor || 0)}</p>
+            <p className="text-xs text-muted-foreground">{r.nota}</p>
           </div>
         ))}
-      </div>
+      </section>
 
-      {/* ALERTAS PROACTIVAS: antes había que entrar a Inventario a mirar */}
-      {alertas === null ? (
-        <div className="mt-6 bg-white border border-slate-200 rounded-xl px-5 py-3 text-sm text-slate-400">
-          <i className="fa-solid fa-spinner fa-spin mr-2"></i>Cargando alertas…
-        </div>
-      ) : (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0) ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-amber-100 bg-amber-50 flex items-center gap-2">
-              <i className="fa-solid fa-triangle-exclamation text-amber-600"></i>
-              <h3 className="font-bold text-slate-800 text-sm">Stock bajo o en alerta <span className="text-slate-400 font-normal">({alertas.stockBajo.length})</span></h3>
-            </div>
-            <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-              {alertas.stockBajo.map(item => (
-                <div key={item.id} className="px-5 py-3 flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-semibold text-slate-700">{item.nombre_equipo}</p>
-                    <p className="text-xs text-slate-400 font-mono">{item.codigo_barra || '—'}</p>
+      {/* Lo que requiere atención */}
+      <section className="space-y-3">
+        <h2 className="text-xl font-bold">Requiere atención</h2>
+        {alertas === null ? (
+          <p className="text-sm text-muted-foreground"><i className="fa-solid fa-circle-notch fa-spin mr-2" aria-hidden="true"></i>Revisando stock y vencimientos…</p>
+        ) : !hayAlertas ? (
+          <p className="rounded-lg border border-ok/40 bg-ok/10 px-5 py-4 font-bold text-ok">Todo en orden: no hay stock bajo ni empaques por vencer.</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Empaques por vencer</CardTitle>
+                <Badge variant="danger">{alertas.cajasPorVencer.length}</Badge>
+              </CardHeader>
+              <CardContent className="max-h-72 overflow-y-auto p-0">
+                {alertas.cajasPorVencer.length === 0 && <p className="px-5 pb-5 text-sm text-muted-foreground">Ninguno en los próximos 7 días.</p>}
+                {alertas.cajasPorVencer.map(caja => (
+                  <div key={caja.id} className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="font-mono font-bold">{caja.codigo_caja}</p>
+                      <p className="truncate text-sm text-muted-foreground">{caja.nombre_equipo}</p>
+                    </div>
+                    <Badge variant={caja.dias_restantes < 0 ? 'danger' : 'warn'}>
+                      {caja.dias_restantes < 0 ? `Vencida hace ${Math.abs(caja.dias_restantes)} d` : caja.dias_restantes === 0 ? 'Vence hoy' : `Vence en ${caja.dias_restantes} d`}
+                    </Badge>
                   </div>
-                  <div className="text-right">
-                    <p className="font-mono text-slate-700">{item.cantidad_disponible} / {item.cantidad_total ?? '—'}</p>
-                    <span className="text-xs font-semibold text-amber-700">{item.estado_actual || 'Bajo crítico'}</span>
+                ))}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Stock bajo el mínimo</CardTitle>
+                <Badge variant="warn">{alertas.stockBajo.length}</Badge>
+              </CardHeader>
+              <CardContent className="max-h-72 overflow-y-auto p-0">
+                {alertas.stockBajo.length === 0 && <p className="px-5 pb-5 text-sm text-muted-foreground">Todos los tipos de caja tienen stock suficiente.</p>}
+                {alertas.stockBajo.map(item => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">{item.nombre_equipo}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{item.codigo_barra || '—'}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-mono font-bold tabular-nums">{item.cantidad_disponible}<span className="text-muted-foreground"> / {item.cantidad_total ?? '—'}</span></p>
+                      <p className="text-xs font-bold text-warn">{item.estado_actual || 'Bajo el mínimo'}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </CardContent>
+            </Card>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-rose-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-rose-100 bg-rose-50 flex items-center gap-2">
-              <i className="fa-solid fa-hourglass-end text-rose-600"></i>
-              <h3 className="font-bold text-slate-800 text-sm">Empaque por vencer <span className="text-slate-400 font-normal">({alertas.cajasPorVencer.length})</span></h3>
-            </div>
-            <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-              {alertas.cajasPorVencer.map(caja => (
-                <div key={caja.id} className="px-5 py-3 flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-semibold text-slate-700 font-mono">{caja.codigo_caja}</p>
-                    <p className="text-xs text-slate-400">{caja.nombre_equipo}</p>
-                  </div>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${caja.dias_restantes < 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {caja.dias_restantes < 0 ? `Vencida hace ${Math.abs(caja.dias_restantes)}d` : `Vence en ${caja.dias_restantes}d`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3 flex items-center gap-3 text-sm text-emerald-700">
-          <i className="fa-solid fa-circle-check"></i>
-          Sin alertas de stock ni de vencimiento de empaque en este momento.
-        </div>
-      )}
+        )}
+      </section>
 
-      {/* SOLICITUDES CRÍTICAS (Actualizado con botón de vincular) */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-6 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-white">
-          <h3 className="font-bold text-slate-800">Solicitudes Activas de Pabellón Quirúrgico</h3>
-        </div>
-        <table className="w-full text-left text-sm text-slate-600">
-          <thead className="text-xs uppercase tracking-wider text-slate-400 border-b">
-            <tr>
-              <th className="px-6 py-4">ID Solicitud</th>
-              <th className="px-6 py-4">Tipo Cirugía</th>
-              <th className="px-6 py-4">Instrumental Requerido</th>
-              <th className="px-6 py-4">Pabellón</th>
-              <th className="px-6 py-4">Estado</th>
-              <th className="px-6 py-4 text-center">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.criticas.map((critica, idx) => (
-              <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 font-bold text-slate-800">REQ-{critica.solicitud_id}</td>
-                <td className="px-6 py-4 font-medium">{critica.tipo_cirugia}</td>
-                <td className="px-6 py-4 text-xs">{critica.caja_requerida}</td>
-                <td className="px-6 py-4 text-slate-500 font-medium">{critica.pabellon}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                    critica.estado_actual === 'Pendiente' ? 'bg-blue-100 text-blue-700' :
-                    'bg-indigo-100 text-indigo-700'
-                  }`}>
-                    {critica.estado_actual}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button 
-                    onClick={() => handleVincular(critica.solicitud_id)}
-                    className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-2 mx-auto"
-                  >
-                    <i className="fa-solid fa-link"></i> Vincular
-                  </button>
-                </td>
-              </tr>
+      {/* Pedidos de pabellón por atender */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Pedidos de pabellón por atender</CardTitle>
+          <CardDescription>Los 5 más recientes. Entregar abre la pantalla de entrega con el pedido cargado.</CardDescription>
+        </CardHeader>
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Pedido</TableHead>
+              <TableHead>Pabellón</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Caja pedida</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Acción</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.criticas.map((c) => (
+              <TableRow key={c.solicitud_id}>
+                <TableCell className="whitespace-nowrap font-mono font-bold">REQ-{c.solicitud_id}</TableCell>
+                <TableCell className="font-bold">{c.pabellon}</TableCell>
+                <TableCell>
+                  <Badge variant={/urgencia/i.test(c.tipo_cirugia || '') ? 'danger' : 'default'}>{c.tipo_cirugia}</Badge>
+                </TableCell>
+                <TableCell className="max-w-xs">{cajaPedida(c.caja_requerida)}</TableCell>
+                <TableCell><Badge variant="info">{c.estado_actual}</Badge></TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" onClick={() => navigate(`/vinculo?solicitud=${c.solicitud_id}`)}>Entregar</Button>
+                </TableCell>
+              </TableRow>
             ))}
             {data.criticas.length === 0 && (
-              <tr>
-                <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
-                  No hay solicitudes pendientes en este momento.
-                </td>
-              </tr>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan="6" className="py-8 text-center text-muted-foreground">No hay pedidos pendientes.</TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
 
-      {/* CAJAS FÍSICAS EN CIRCULACIÓN (colapsable) */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-6 overflow-hidden">
-        <button
-          onClick={() => setShowCajasCirculacion(prev => !prev)}
-          className="w-full px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between text-left hover:bg-slate-100 transition-colors"
-        >
-          <div>
-            <h3 className="font-bold text-slate-800">Cajas en Circulación <span className="text-slate-400 font-normal">({cajasCirculacion.length})</span></h3>
-            <p className="text-xs text-slate-500 mt-0.5">Unidades físicas individuales con movimientos activos, antes de su eliminación.</p>
-          </div>
-          <i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${showCajasCirculacion ? 'rotate-180' : ''}`}></i>
-        </button>
-        {showCajasCirculacion && (
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="text-xs uppercase tracking-wider text-slate-400 border-b">
-              <tr>
-                <th className="px-6 py-4">Código de Caja</th>
-                <th className="px-6 py-4">Tipo</th>
-                <th className="px-6 py-4">Destino Actual</th>
-                <th className="px-6 py-4">Última Actualización</th>
-                <th className="px-6 py-4">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cajasCirculacion.map((caja) => (
-                <tr key={caja.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-slate-800 font-mono">{caja.codigo_caja}</td>
-                  <td className="px-6 py-4">{caja.nombre_equipo}</td>
-                  <td className="px-6 py-4 text-slate-500">{caja.destino_nombre || 'Sin destino'}</td>
-                  <td className="px-6 py-4 text-xs text-slate-500">{caja.ultima_actualizacion ? formatDate(caja.ultima_actualizacion) : '—'}</td>
-                  <td className="px-6 py-4">
-                    {caja.estado_nuevo ? (
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        caja.estado_nuevo === 'Despachado' ? 'bg-emerald-100 text-emerald-700' :
-                        caja.estado_nuevo === 'Alerta Merma' ? 'bg-amber-100 text-amber-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {caja.estado_nuevo}
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
-                        Sin movimientos aún
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {cajasCirculacion.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
-                    No hay cajas físicas registradas en circulación.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* TABLA DE TRAZABILIDAD */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mt-6 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-slate-800">Últimos Movimientos de Trazabilidad</h3>
-        </div>
-        <table className="w-full text-left text-sm text-slate-600">
-          <thead className="bg-white text-slate-500 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-3">Folio</th>
-              <th className="px-6 py-3">Caja / Instrumental</th>
-              <th className="px-6 py-3">Destino</th>
-              <th className="px-6 py-3">Fecha</th>
-              <th className="px-6 py-3">Estado Actual</th>
-              <th className="px-6 py-3 text-center">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
+      {/* Últimos movimientos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Últimos movimientos</CardTitle>
+          <CardDescription>Los 5 cambios de estado más recientes de cualquier caja.</CardDescription>
+        </CardHeader>
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Hora</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Detalle</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead className="text-right">Historial</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data.movimientos.map((mov) => (
-              <tr key={mov.id} className="border-b border-slate-100">
-                <td className="px-6 py-4 font-bold text-slate-800">{`#FOL-${String(mov.id).padStart(4, '0')}`}</td>
-                <td className="px-6 py-4">{mov.justificacion}</td>
-                <td className="px-6 py-4">{mov.destino || 'Sin destino'}</td>
-                <td className="px-6 py-4 text-xs text-slate-500">{mov.fecha_cambio ? formatDate(mov.fecha_cambio) : '—'}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                    mov.estado_nuevo === 'Despachado' ? 'bg-emerald-100 text-emerald-700' :
-                    mov.estado_nuevo === 'Alerta Merma' ? 'bg-amber-100 text-amber-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {mov.estado_nuevo}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button onClick={() => abrirDetalles(mov)} className="text-slate-400 hover:text-sky-600">
-                    <i className="fa-solid fa-eye"></i>
-                  </button>
-                </td>
-              </tr>
+              <TableRow key={mov.id}>
+                <TableCell className="whitespace-nowrap font-mono text-muted-foreground">{mov.fecha_cambio ? fecha(mov.fecha_cambio) : '—'}</TableCell>
+                <TableCell><Badge variant={varianteEstado(mov.estado_nuevo)}>{nombreEstado(mov.estado_nuevo)}</Badge></TableCell>
+                <TableCell>{mov.justificacion}</TableCell>
+                <TableCell className="text-muted-foreground">{mov.destino || '—'}</TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="sm" onClick={() => abrirDetalles(mov)} aria-label={`Ver historial del movimiento ${mov.id}`}>Ver</Button>
+                </TableCell>
+              </TableRow>
             ))}
             {data.movimientos.length === 0 && (
-              <tr>
-                <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
-                  No hay movimientos registrados aún.
-                </td>
-              </tr>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan="5" className="py-8 text-center text-muted-foreground">No hay movimientos registrados aún.</TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
+
+      {/* Cajas en circulación (colapsable) */}
+      <Card>
+        <button
+          onClick={() => setShowCajasCirculacion(prev => !prev)}
+          aria-expanded={showCajasCirculacion}
+          className="flex w-full items-center justify-between gap-4 rounded-lg p-5 text-left hover:bg-muted/40"
+        >
+          <div>
+            <p className="text-lg font-bold">Todas las cajas en circulación <span className="font-mono text-muted-foreground">({cajasCirculacion.length})</span></p>
+            <p className="text-sm text-muted-foreground">Dónde está cada caja y cuándo se movió por última vez.</p>
+          </div>
+          <i className={`fa-solid fa-chevron-down text-muted-foreground transition-transform ${showCajasCirculacion ? 'rotate-180' : ''}`} aria-hidden="true"></i>
+        </button>
+        {showCajasCirculacion && (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Caja</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Ubicación</TableHead>
+                <TableHead>Último movimiento</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cajasCirculacion.map((caja) => (
+                <TableRow key={caja.id}>
+                  <TableCell className="font-mono font-bold">{caja.codigo_caja}</TableCell>
+                  <TableCell>{caja.nombre_equipo}</TableCell>
+                  <TableCell><Badge variant={varianteEstado(caja.estado_nuevo)}>{nombreEstado(caja.estado_nuevo)}</Badge></TableCell>
+                  <TableCell className="text-muted-foreground">{caja.destino_nombre || '—'}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-muted-foreground">{caja.ultima_actualizacion ? fecha(caja.ultima_actualizacion) : '—'}</TableCell>
+                </TableRow>
+              ))}
+              {cajasCirculacion.length === 0 && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan="5" className="py-8 text-center text-muted-foreground">No hay cajas registradas en circulación.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={modalContent} />
     </div>

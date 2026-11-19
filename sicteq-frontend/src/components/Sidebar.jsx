@@ -1,99 +1,81 @@
-import { Link, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { SECCIONES } from '@/navegacion';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
-  const location = useLocation();
-
-  const isActive = (path) => location.pathname === path ? "bg-sky-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white";
-
-  // Función para cerrar el menú en móviles al hacer clic en un enlace
-  const handleLinkClick = () => {
-    if (window.innerWidth < 768) {
-      setIsOpen(false);
-    }
-  };
+  const cerrarEnMovil = () => { if (window.innerWidth < 768) setIsOpen?.(false); };
 
   return (
     <>
-      {/* Overlay oscuro para móvil cuando el menú está abierto */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/80 z-20 md:hidden backdrop-blur-sm transition-opacity" 
-          onClick={() => setIsOpen(false)}
-        ></div>
+        <div className="fixed inset-0 z-20 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setIsOpen(false)} />
       )}
 
-      {/* Menú Lateral (Sidebar) */}
-      <aside className={`fixed md:static inset-y-0 left-0 w-64 bg-slate-900 text-white flex flex-col justify-between z-30 shadow-2xl h-screen transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out border-r border-slate-800`}>
-        <div>
-            <div className="p-5 bg-slate-950 flex items-center justify-between border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                    <i className="fa-solid fa-hospital text-sky-400 text-2xl"></i>
-                    <div>
-                        <h1 className="font-bold text-lg leading-tight tracking-wider">SICTEQ</h1>
-                        <span className="text-xs text-slate-400">HFRZ - Gestión</span>
-                    </div>
-                </div>
-                {/* Botón X para cerrar en móvil */}
-                <button 
-                  onClick={() => setIsOpen(false)} 
-                  className="md:hidden w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                >
-                  <i className="fa-solid fa-xmark text-xl"></i>
-                </button>
-            </div>
-            
-            <nav className="mt-6 px-3 space-y-1">
-                <Link to="/" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/')}`}>
-                    <i className="fa-solid fa-chart-pie text-lg w-5"></i> Dashboard Central
-                </Link>
-                <Link to="/solicitudes" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/solicitudes')}`}>
-                    <i className="fa-solid fa-clipboard-list text-lg w-5"></i> Solicitudes Pabellón
-                </Link>
-                <Link to="/ciclo" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/ciclo')}`}>
-                    <i className="fa-solid fa-barcode text-lg w-5"></i> Ciclo Trazabilidad
-                </Link>
-                <Link to="/autoclave" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/autoclave')}`}>
-                    <i className="fa-solid fa-temperature-high text-lg w-5"></i> Cargas de Autoclave
-                </Link>
-                <Link to="/etiquetas" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/etiquetas')}`}>
-                    <i className="fa-solid fa-tags text-lg w-5"></i> Etiquetas de Cajas
-                </Link>
-                <Link to="/vinculo" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/vinculo')}`}>
-                    <i className="fa-solid fa-link text-lg w-5"></i> Vínculo Clínico
-                </Link>
-                <Link to="/inventario" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/inventario')}`}>
-                    <i className="fa-solid fa-boxes-stacked text-lg w-5"></i> Inventario y Mermas
-                </Link>
-                {user.role === 'IT' && (
-                <Link to="/auditoria" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/auditoria')}`}>
-                    <i className="fa-solid fa-user-shield text-lg w-5"></i> Auditoría
-                </Link>
-                )}
-                <Link to="/reportes" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/reportes')}`}>
-                    <i className="fa-solid fa-file-lines text-lg w-5"></i> Reportes de Gestión
-                </Link>
-                <Link to="/indicadores" onClick={handleLinkClick} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-lg transition-all ${isActive('/indicadores')}`}>
-                    <i className="fa-solid fa-gauge-high text-lg w-5"></i> Indicadores (KPI)
-                </Link>
-            </nav>
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 md:static md:translate-x-0',
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
+          <div className="leading-tight">
+            <p className="font-mono text-lg font-bold tracking-[0.2em] text-primary">SICTEQ</p>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Central de Esterilización · HFRZ</p>
+          </div>
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsOpen(false)} aria-label="Cerrar menú">
+            <i className="fa-solid fa-xmark text-lg" aria-hidden="true"></i>
+          </Button>
         </div>
-        
-        <div className="bg-slate-950 border-t border-slate-800 p-4 space-y-3">
-            <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-sm">
-                    {user.name.substring(0,2).toUpperCase()}
-                </div>
-                <div className="overflow-hidden">
-                    <p className="text-xs font-bold text-slate-200 truncate">{user.name}</p>
-                    <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">{user.role}</p>
-                </div>
+
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Menú principal">
+          {SECCIONES.map((seccion) => {
+            const items = seccion.items.filter((i) => !i.soloRol || i.soloRol === user.role);
+            if (!items.length) return null;
+            return (
+              <div key={seccion.titulo} className="space-y-1">
+                <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80">{seccion.titulo}</p>
+                {items.map((item) => (
+                  <NavLink
+                    key={item.ruta}
+                    to={item.ruta}
+                    end
+                    onClick={cerrarEnMovil}
+                    className={({ isActive }) =>
+                      cn(
+                        'group flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-[15px] transition-colors',
+                        isActive
+                          ? 'border-primary bg-primary/10 font-bold text-foreground'
+                          : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <i className={cn('fa-solid w-5 text-center', item.icono, isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')} aria-hidden="true"></i>
+                        {item.nombre}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            );
+          })}
+        </nav>
+
+        <div className="space-y-3 border-t border-border p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted font-mono text-sm font-bold text-primary">
+              {user.name.substring(0, 2).toUpperCase()}
             </div>
-            <button 
-                onClick={onLogout}
-                className="w-full text-center bg-slate-800 hover:bg-red-900 text-slate-300 hover:text-white text-xs py-1.5 rounded font-bold transition-colors"
-            >
-                <i className="fa-solid fa-right-from-bracket mr-1"></i> Cerrar Sesión
-            </button>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold">{user.name}</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{user.role}</p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" className="w-full" onClick={onLogout}>
+            <i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión
+          </Button>
         </div>
       </aside>
     </>

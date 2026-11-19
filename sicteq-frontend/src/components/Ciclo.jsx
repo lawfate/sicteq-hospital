@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import { apiFetch } from '../api';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input, Select, Textarea, Label } from '@/components/ui/input';
+import { ETAPAS, nombreEstado, varianteEstado } from '@/etapas';
 
 // Deriva el número de etapa desde el texto de estado_nuevo, ej. "Etapa 3".
 // area_destino_id NO sirve para esto: esa columna referencia el pabellón/área
@@ -41,14 +46,6 @@ export default function Ciclo() {
   const [vigenciaDias, setVigenciaDias] = useState("365");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const steps = [
-    { id: 1, name: "Recepción", icon: "fa-check" },
-    { id: 2, name: "Lavado", icon: "fa-soap" },
-    { id: 3, name: "Preparación", icon: "fa-wrench" },
-    { id: 4, name: "Esterilización", icon: "fa-circle-radiation" },
-    { id: 5, name: "Almacenamiento", icon: "fa-warehouse" },
-    { id: 6, name: "Entrega", icon: "fa-truck-ramp-box" }
-  ];
 
   const handleSearch = async () => {
     try {
@@ -170,154 +167,188 @@ export default function Ciclo() {
     }
   };
 
+  const etapaDestino = ETAPAS.find(e => e.id === targetStage);
+
   return (
-    <section className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Ciclo de Trazabilidad</h2>
-        <p className="text-slate-500 text-sm">Escanee el código de la caja para auditar o avanzar la línea de tiempo.</p>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-6">
+      {/* Escáner: lo primero y lo más grande de la pantalla */}
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-end">
+          <div className="flex-1 space-y-1.5">
+            <Label htmlFor="buscar-caja">Escanee o escriba el código de la caja</Label>
+            <Input
+              id="buscar-caja"
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              // PB-06: listo para la pistola apenas se abre la pantalla; al volver
+              // a enfocarlo se selecciona el texto, así el siguiente escaneo lo reemplaza.
+              autoFocus
+              onFocus={(e) => e.target.select()}
+              placeholder="CAJA-0045"
+              className="h-14 font-mono text-xl uppercase tracking-widest"
+            />
+          </div>
+          <Button size="lg" onClick={handleSearch}>Buscar caja</Button>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 h-fit">
-            <h3 className="font-bold text-slate-800 text-sm">Entrada de Acción</h3>
-            <div className="space-y-3">
-                <input
-                  type="text"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  // PB-06: listo para la pistola apenas se abre la pantalla; al volver
-                  // a enfocarlo se selecciona el texto, así el siguiente escaneo lo reemplaza.
-                  autoFocus
-                  onFocus={(e) => e.target.select()}
-                  placeholder="Escanee o escriba: CAJA-0045"
-                  className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50 uppercase tracking-wider"
-                />
-                <button onClick={handleSearch} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm hover:bg-slate-800">Buscar</button>
+      {!activeBox && (
+        <p className="text-muted-foreground">Al escanear una caja verá en qué etapa está, su historial y podrá moverla a la siguiente.</p>
+      )}
 
-                {activeBox && (
-                    <select value={targetStage} onChange={(e) => setTargetStage(parseInt(e.target.value))} className="w-full p-2 border border-sky-300 rounded-lg text-sm bg-sky-50 font-bold text-sky-700">
-                        {steps.map(s => <option key={s.id} value={s.id}>{s.id}. {s.name}</option>)}
-                    </select>
-                )}
-            </div>
-            {activeBox && (
-                <button onClick={() => setIsModalOpen(true)} className="w-full bg-sky-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-sky-700">
-                    Procesar Acción
-                </button>
-            )}
-        </div>
+      {activeBox && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            {/* Línea de tiempo */}
+            <Card>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <CardTitle className="font-mono text-2xl">{activeBox.codigo}</CardTitle>
+                <Badge variant="info" className="px-3 py-1 text-sm">{ETAPAS.find(e => e.id === activeBox.stage)?.nombre}</Badge>
+              </CardHeader>
+              <CardContent>
+                <ol className="grid grid-cols-3 gap-2 2xl:grid-cols-6">
+                  {ETAPAS.map((etapa) => {
+                    const hecha = activeBox.stage > etapa.id;
+                    const actual = activeBox.stage === etapa.id;
+                    return (
+                      <li key={etapa.id} className={`rounded-md border p-3 ${actual ? 'border-primary bg-primary/10' : hecha ? 'border-border bg-muted' : 'border-dashed border-border'}`}>
+                        <p className={`font-mono text-xs ${actual ? 'text-primary' : 'text-muted-foreground'}`}>{etapa.id}</p>
+                        <p className={`text-sm font-bold leading-tight hyphens-auto break-words ${actual ? 'text-foreground' : hecha ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>{etapa.nombre}</p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </CardContent>
+            </Card>
 
-        {activeBox && (
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm md:col-span-2 space-y-6">
-                <h3 className="font-bold text-slate-800">Línea de Tiempo: <span className="font-mono text-sky-700">{activeBox.codigo}</span></h3>
-                <div className="flex justify-between relative px-2 mb-4">
-                    <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-200 -z-0"></div>
-                    {steps.map((step) => (
-                        <div key={step.id} className="flex flex-col items-center relative z-10">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${activeBox.stage >= step.id ? 'bg-sky-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                                <i className={`fa-solid ${step.icon}`}></i>
-                            </div>
-                            <span className="text-[9px] font-bold mt-2 text-slate-500 uppercase text-center">{step.name}</span>
-                        </div>
-                    ))}
-                </div>
-
-                {pacientesVinculados.length > 0 && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
-                        <h4 className="text-xs font-bold text-emerald-700 uppercase flex items-center gap-2"><i className="fa-solid fa-user-injured"></i>Paciente(s) vinculado(s) a esta caja</h4>
-                        {pacientesVinculados.map(p => (
-                            <div key={p.id} className="flex justify-between items-center bg-white p-2 rounded border border-emerald-100 text-xs">
-                                <span className="font-bold text-slate-800">{p.nombre} <span className="text-slate-400 font-mono font-normal">({p.rut})</span></span>
-                                <span className="text-slate-500">{new Date(p.fecha_vinculo).toLocaleDateString()}</span>
-                            </div>
-                        ))}
+            {/* Bitácora */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Historial de la caja</CardTitle>
+                <CardDescription>Del movimiento más reciente al más antiguo.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {logs.map((log, idx) => (
+                  <div key={idx} className="grid gap-1 rounded-md border border-border bg-background p-3 sm:grid-cols-[10rem_1fr]">
+                    <p className="font-mono text-sm text-muted-foreground">{log.fecha_cambio ? new Date(log.fecha_cambio).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : log.time}</p>
+                    <div className="space-y-1">
+                      <Badge variant={varianteEstado(log.estado_nuevo)}>{nombreEstado(log.estado_nuevo || log.event)}</Badge>
+                      {log.metodo_esterilizacion && (
+                        <p className="font-mono text-sm text-primary">
+                          {log.metodo_esterilizacion}
+                          {log.temperatura ? ` · ${log.temperatura} °C` : ''}
+                          {log.presion ? ` · ${log.presion}` : ''}
+                          {log.tiempo_minutos ? ` · ${log.tiempo_minutos} min` : ''}
+                        </p>
+                      )}
+                      {log.justificacion && log.justificacion !== `Avance a ${log.estado_nuevo}` && (
+                        <p className="text-sm text-muted-foreground">{log.justificacion}</p>
+                      )}
                     </div>
-                )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
 
-                <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase">Bitácora</h4>
-                    {logs.map((log, idx) => (
-                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                            <p className="font-bold text-slate-800">{log.estado_nuevo || log.event || "Actualización de estado"}</p>
-                            {log.metodo_esterilizacion && (
-                                <p className="text-sky-700 font-mono text-[11px] mt-1">
-                                    {log.metodo_esterilizacion}
-                                    {log.temperatura ? ` · ${log.temperatura}°C` : ''}
-                                    {log.presion ? ` · ${log.presion}` : ''}
-                                    {log.tiempo_minutos ? ` · ${log.tiempo_minutos} min` : ''}
-                                </p>
-                            )}
-                            {log.justificacion && log.justificacion !== `Avance a ${log.estado_nuevo}` && (
-                                <p className="text-red-600 italic">Motivo/Comentario: {log.justificacion}</p>
-                            )}
-                            <p className="text-slate-500">{log.fecha_cambio ? new Date(log.fecha_cambio).toLocaleString() : log.time}</p>
-                        </div>
-                    ))}
+          <div className="space-y-6">
+            {/* Mover de etapa */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Mover la caja</CardTitle>
+                <CardDescription>Elija la etapa a la que pasa la caja.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="etapa-destino">Pasa a</Label>
+                  <Select id="etapa-destino" value={targetStage} onChange={(e) => setTargetStage(parseInt(e.target.value))}>
+                    {ETAPAS.map(s => <option key={s.id} value={s.id}>{s.id}. {s.nombre}</option>)}
+                  </Select>
                 </div>
-            </div>
-        )}
-      </div>
+                {esRetroceso && <p className="rounded-md border border-warn/40 bg-warn/15 p-3 text-sm font-bold text-warn">Es un retroceso: tendrá que escribir el motivo.</p>}
+                <Button size="lg" className="w-full" onClick={() => setIsModalOpen(true)}>Continuar</Button>
+              </CardContent>
+            </Card>
+
+            {pacientesVinculados.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pacientes con esta caja</CardTitle>
+                  <CardDescription>{pacientesVinculados.length} en total; se muestran los 3 más recientes.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {pacientesVinculados.slice(0, 3).map(p => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold">{p.nombre}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{p.rut}</span>
+                      </span>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">{new Date(p.fecha_vinculo).toLocaleDateString('es-CL')}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        content={{ title: "Confirmar Acción", items: logs }}
+        content={{ title: `Mover ${activeBox?.codigo || ''} a ${etapaDestino?.nombre || ''}` }}
       >
-          <div className="space-y-4">
-              {requiereProbarEsterilizacion(targetStage) && (
-                  <div className="bg-sky-50 p-3 rounded-lg border border-sky-200 space-y-3">
-                      <p className="text-xs font-bold text-sky-800 uppercase">Parámetros del ciclo de esterilización</p>
-                      <p className="text-[11px] text-sky-700 -mt-2">Complete esto o deje un comentario justificando por qué no los tiene.</p>
-                      <div className="flex flex-col gap-1">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase">Método</label>
-                          <select value={metodo} onChange={(e) => setMetodo(e.target.value)} className="w-full p-2 rounded text-sm border border-slate-300 bg-white">
-                              {METODOS_ESTERILIZACION.map(m => <option key={m} value={m}>{m}</option>)}
-                          </select>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                          <div className="flex flex-col gap-1">
-                              <label className="text-[11px] font-bold text-slate-500 uppercase">Temp. (°C)</label>
-                              <input type="number" step="0.1" className="w-full p-2 rounded text-sm border border-slate-300" value={temperatura} onChange={(e) => setTemperatura(e.target.value)} placeholder="134" />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                              <label className="text-[11px] font-bold text-slate-500 uppercase">Presión</label>
-                              <input type="text" className="w-full p-2 rounded text-sm border border-slate-300" value={presion} onChange={(e) => setPresion(e.target.value)} placeholder="2.1 bar" />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                              <label className="text-[11px] font-bold text-slate-500 uppercase">Tiempo (min)</label>
-                              <input type="number" className="w-full p-2 rounded text-sm border border-slate-300" value={tiempoMinutos} onChange={(e) => setTiempoMinutos(e.target.value)} placeholder="20" />
-                          </div>
-                      </div>
-                      {targetStage === 5 && (
-                          <div className="flex flex-col gap-1 pt-1 border-t border-sky-100">
-                              <label className="text-[11px] font-bold text-slate-500 uppercase">Vigencia del empaque (días)</label>
-                              <input type="number" min="1" className="w-32 p-2 rounded text-sm border border-slate-300" value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} placeholder="365" />
-                              <p className="text-[11px] text-sky-700">Desde hoy se calcula la fecha de caducidad del empaque estéril.</p>
-                          </div>
-                      )}
-                  </div>
-              )}
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <label className="text-xs font-bold text-slate-700 block mb-2">
-                      {esRetroceso
-                        ? "Motivo de Retroceso (Obligatorio)"
-                        : requiereJustificarSinParametros
-                          ? "Comentario (Obligatorio: faltan los parámetros de esterilización)"
-                          : "Comentario Adicional (Opcional)"}
-                  </label>
-                  <textarea
-                      className="w-full p-2 rounded text-sm border border-slate-300"
-                      value={rollbackReason}
-                      onChange={(e) => setRollbackReason(e.target.value)}
-                      placeholder="Escriba aquí..."
-                  ></textarea>
+        <div className="space-y-4">
+          {requiereProbarEsterilizacion(targetStage) && (
+            <div className="space-y-3 rounded-md border border-primary/40 bg-primary/10 p-4">
+              <p className="text-sm font-bold">Resultado del ciclo de esterilización</p>
+              <p className="-mt-2 text-sm text-muted-foreground">Complete los datos del voucher, o explique abajo por qué no los tiene.</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="metodo-ciclo">Método</Label>
+                <Select id="metodo-ciclo" value={metodo} onChange={(e) => setMetodo(e.target.value)}>
+                  {METODOS_ESTERILIZACION.map(m => <option key={m} value={m}>{m}</option>)}
+                </Select>
               </div>
-            <button onClick={executeAction} disabled={isSubmitting} className="w-full bg-sky-600 text-white py-2 rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                {isSubmitting ? "Guardando..." : "Confirmar"}
-            </button>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="temp-ciclo">°C</Label>
+                  <Input id="temp-ciclo" type="number" step="0.1" className="font-mono" value={temperatura} onChange={(e) => setTemperatura(e.target.value)} placeholder="134" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="presion-ciclo">Presión</Label>
+                  <Input id="presion-ciclo" type="text" className="font-mono" value={presion} onChange={(e) => setPresion(e.target.value)} placeholder="2.1 bar" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="min-ciclo">Minutos</Label>
+                  <Input id="min-ciclo" type="number" className="font-mono" value={tiempoMinutos} onChange={(e) => setTiempoMinutos(e.target.value)} placeholder="20" />
+                </div>
+              </div>
+              {targetStage === 5 && (
+                <div className="space-y-1.5 border-t border-border pt-3">
+                  <Label htmlFor="vigencia">Vigencia del empaque (días)</Label>
+                  <Input id="vigencia" type="number" min="1" className="w-32 font-mono" value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} placeholder="365" />
+                  <p className="text-xs text-muted-foreground">Desde hoy se calcula la fecha de vencimiento del empaque.</p>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="comentario">
+              {esRetroceso
+                ? "Motivo del retroceso (obligatorio)"
+                : requiereJustificarSinParametros
+                  ? "Comentario (obligatorio: faltan los datos del ciclo)"
+                  : "Comentario (opcional)"}
+            </Label>
+            <Textarea id="comentario" value={rollbackReason} onChange={(e) => setRollbackReason(e.target.value)} placeholder="Escriba aquí…" />
           </div>
+          <Button size="lg" onClick={executeAction} disabled={isSubmitting} className="w-full">
+            {isSubmitting ? "Guardando…" : "Confirmar"}
+          </Button>
+        </div>
       </Modal>
-    </section>
+    </div>
   );
 }
