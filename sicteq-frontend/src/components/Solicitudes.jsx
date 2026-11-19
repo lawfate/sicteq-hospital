@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, Textarea, Label } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+
+const TIPOS = ['Programada', 'Urgencia Médica'];
 
 // Importante: Recibimos el 'user' como prop (la enfermera conectada)
 export default function Solicitudes({ user }) {
@@ -12,21 +18,17 @@ export default function Solicitudes({ user }) {
   });
   const [status, setStatus] = useState({ loading: false, message: '', type: '' });
 
-  // 1. Cargar las 22 áreas desde el backend al iniciar la vista
+  // Pabellones y áreas de destino, desde el backend.
   useEffect(() => {
     apiFetch(`/api/solicitudes/areas`)
       .then(res => res.json())
       .then(data => {
         setAreas(data);
-        if (data.length > 0) {
-          // Seleccionamos el primer pabellón por defecto
-          setFormData(prev => ({ ...prev, area_id: data[0].id })); 
-        }
+        if (data.length > 0) setFormData(prev => ({ ...prev, area_id: data[0].id }));
       })
       .catch(err => console.error("Error al cargar áreas:", err));
   }, []);
 
-  // 2. Enviar la solicitud a la base de datos
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus({ loading: true, message: '', type: '' });
@@ -36,7 +38,7 @@ export default function Solicitudes({ user }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          usuario_id: user.id, // <-- Aquí amarramos la petición a la enfermera
+          usuario_id: user.id,
           area_id: formData.area_id,
           tipo_cirugia: formData.cirugia,
           instrumental: formData.instrumental,
@@ -44,93 +46,85 @@ export default function Solicitudes({ user }) {
         })
       });
 
-      if (!response.ok) throw new Error('Error al enviar la solicitud');
+      if (!response.ok) throw new Error('No se pudo enviar el pedido. Intente de nuevo.');
 
-      setStatus({ loading: false, message: '¡Requerimiento enviado con éxito a la Central!', type: 'success' });
-      setFormData({ ...formData, obs: '' }); // Limpiamos solo las observaciones tras el éxito
-
-      // Ocultar el mensaje de éxito después de 3 segundos
-      setTimeout(() => setStatus({ loading: false, message: '', type: '' }), 3000);
-
+      setStatus({ loading: false, message: 'Pedido enviado a la Central.', type: 'success' });
+      setFormData({ ...formData, obs: '' });
+      setTimeout(() => setStatus({ loading: false, message: '', type: '' }), 4000);
     } catch (error) {
       setStatus({ loading: false, message: error.message, type: 'error' });
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="border-b border-slate-100 pb-4">
-        <h2 className="text-xl font-bold text-slate-900">Nueva Solicitud de Instrumental Quirúrgico</h2>
-        <p className="text-xs text-slate-500">Módulo exclusivo para solicitudes asistenciales. Usuario actual: <span className="font-bold text-sky-600">{user?.name}</span></p>
-      </div>
+    <div className="mx-auto max-w-2xl">
+      <Card>
+        <CardHeader>
+          <CardTitle>Nuevo pedido de cajas para pabellón</CardTitle>
+          <CardDescription>El pedido queda a nombre de <span className="font-bold text-foreground">{user?.name}</span> y aparece al instante en el Panel de la Central.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <fieldset className="space-y-1.5">
+              <legend className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">Tipo de cirugía</legend>
+              <div className="grid grid-cols-2 gap-3" role="radiogroup">
+                {TIPOS.map(t => {
+                  const activo = formData.cirugia === t;
+                  const urgencia = t !== 'Programada';
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      role="radio"
+                      aria-checked={activo}
+                      onClick={() => setFormData({ ...formData, cirugia: t })}
+                      className={cn(
+                        'h-14 rounded-md border text-base font-bold transition-colors',
+                        activo
+                          ? (urgencia ? 'border-danger bg-danger/15 text-danger' : 'border-primary bg-primary/15 text-primary')
+                          : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                      )}
+                    >
+                      {urgencia ? 'Urgencia' : 'Programada'}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
-        
-        {/* Alertas de Éxito o Error */}
-        {status.message && (
-          <div className={`p-3 rounded-lg text-sm font-medium text-center ${status.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-            {status.message}
-          </div>
-        )}
+            <div className="space-y-1.5">
+              <Label htmlFor="pabellon">Pabellón de destino</Label>
+              <Select id="pabellon" value={formData.area_id} onChange={(e) => setFormData({ ...formData, area_id: e.target.value })}>
+                {areas.map(area => <option key={area.id} value={area.id}>{area.nombre}</option>)}
+              </Select>
+            </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-slate-500 uppercase">Tipo de Cirugía</label>
-            <select 
-                value={formData.cirugia}
-                onChange={(e) => setFormData({...formData, cirugia: e.target.value})}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 outline-none"
-            >
-              <option>Programada</option>
-              <option>Urgencia Médica</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-slate-500 uppercase">Pabellón Destino</label>
-            <select 
-                value={formData.area_id}
-                onChange={(e) => setFormData({...formData, area_id: e.target.value})}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 outline-none"
-            >
-              {/* Iteramos sobre las 22 áreas traídas de la BD */}
-              {areas.map(area => (
-                <option key={area.id} value={area.id}>{area.nombre}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-slate-500 uppercase">Instrumental Requerido</label>
-            <select 
-                value={formData.instrumental}
-                onChange={(e) => setFormData({...formData, instrumental: e.target.value})}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 outline-none"
-            >
+            <div className="space-y-1.5">
+              <Label htmlFor="instrumental">Caja que necesita</Label>
+              <Select id="instrumental" value={formData.instrumental} onChange={(e) => setFormData({ ...formData, instrumental: e.target.value })}>
                 <option>Set Estándar de Cesárea</option>
                 <option>Set Colecistectomía Laparoscópica</option>
                 <option>Caja de Instrumental Mayor Cirugía General</option>
-            </select>
-        </div>
+              </Select>
+            </div>
 
-        <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-slate-500 uppercase">Observaciones Especiales</label>
-            <textarea 
-                value={formData.obs}
-                onChange={(e) => setFormData({...formData, obs: e.target.value})}
-                className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 h-24 focus:ring-2 focus:ring-sky-500 outline-none resize-none" 
-                placeholder="Ej: Adicionar pinzas de disección largas..."
-            ></textarea>
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="obs">Observaciones (opcional)</Label>
+              <Textarea id="obs" value={formData.obs} onChange={(e) => setFormData({ ...formData, obs: e.target.value })} placeholder="Ej.: agregar pinzas de disección largas" />
+            </div>
 
-        <button 
-          type="submit" 
-          disabled={status.loading}
-          className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-bold py-2.5 rounded-lg text-sm transition-colors shadow-md flex justify-center items-center gap-2"
-        >
-            {status.loading ? <><i className="fa-solid fa-spinner fa-spin"></i> Procesando...</> : 'Enviar Requerimiento en Línea'}
-        </button>
-      </form>
+            {status.message && (
+              <p role={status.type === 'success' ? 'status' : 'alert'} className={cn('rounded-md border p-3 text-sm font-bold', status.type === 'success' ? 'border-ok/40 bg-ok/15 text-ok' : 'border-danger/40 bg-danger/15 text-danger')}>
+                {status.message}
+              </p>
+            )}
+
+            <Button type="submit" size="lg" disabled={status.loading} className="w-full">
+              {status.loading ? <><i className="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Enviando…</> : 'Enviar pedido a la Central'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

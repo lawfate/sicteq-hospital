@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../api';
 import { code39Svg } from '../barcode';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { nombreEstado, varianteEstado } from '@/etapas';
+import { cn } from '@/lib/utils';
 
 // Un código con caracteres fuera de Code 39 no debe botar la pantalla entera.
 const svgSeguro = (codigo, opts) => {
@@ -65,51 +72,45 @@ export default function Etiquetas() {
   });
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Etiquetas de Cajas</h2>
-        <p className="text-slate-500 text-sm">Imprima la etiqueta con código de barras de cada caja. Luego basta con escanearla en Ciclo de Trazabilidad o en Cargas de Autoclave.</p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <p className="max-w-3xl text-muted-foreground">Marque las cajas y presione Imprimir. Cada etiqueta lleva el código de barras: después basta con escanearla en Seguimiento de cajas o en Cargas de autoclave.</p>
 
-      {error && <p className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">{error}</p>}
+      {error && <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>}
 
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-3 items-center">
-        <input value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="Filtrar por código o tipo de caja"
-          className="flex-1 min-w-[200px] p-2 border border-slate-300 rounded-lg text-sm" />
-        <span className="text-sm text-slate-500">{sel.size} seleccionada(s)</span>
-        <button disabled={sel.size === 0} onClick={() => imprimir(cajas.filter(c => sel.has(c.codigo_caja)))}
-          className="bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed">
-          <i className="fa-solid fa-print mr-2"></i>Imprimir etiquetas
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
-            <tr>
-              <th className="p-3 w-10"><input type="checkbox" checked={todasVisibles} onChange={toggleTodas} aria-label="Seleccionar todas las visibles" /></th>
-              <th className="p-3 text-left">Código</th>
-              <th className="p-3 text-left">Tipo de caja</th>
-              <th className="p-3 text-left">Último estado</th>
-              <th className="p-3 text-left">Vista previa</th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card>
+        <div className="flex flex-wrap items-center gap-3 p-4">
+          <Input value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="Filtrar por código o tipo de caja" aria-label="Filtrar cajas" className="min-w-[220px] flex-1" />
+          <span className="font-mono text-sm text-muted-foreground">{sel.size} marcada{sel.size === 1 ? '' : 's'}</span>
+          <Button disabled={sel.size === 0} onClick={() => imprimir(cajas.filter(c => sel.has(c.codigo_caja)))}>
+            <i className="fa-solid fa-print" aria-hidden="true"></i> Imprimir etiquetas
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-10"><input type="checkbox" className="h-4 w-4 accent-primary" checked={todasVisibles} onChange={toggleTodas} aria-label="Marcar todas las visibles" /></TableHead>
+              <TableHead>Caja</TableHead>
+              <TableHead>Tipo de caja</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Vista previa</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {visibles.map(c => (
-              <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => toggle(c.codigo_caja)}>
-                <td className="p-3"><input type="checkbox" checked={sel.has(c.codigo_caja)} onChange={() => toggle(c.codigo_caja)} onClick={e => e.stopPropagation()} aria-label={`Seleccionar ${c.codigo_caja}`} /></td>
-                <td className="p-3 font-mono font-bold">{c.codigo_caja}</td>
-                <td className="p-3">{c.nombre_equipo}</td>
-                <td className="p-3 text-slate-500">{c.estado_nuevo || 'Sin movimientos'}</td>
-                <td className="p-3"><div className="w-40" dangerouslySetInnerHTML={{ __html: svgSeguro(c.codigo_caja, { alto: 28, modulo: 1 }) }} /></td>
-              </tr>
+              <TableRow key={c.id} className={cn('cursor-pointer', sel.has(c.codigo_caja) && 'bg-primary/10 hover:bg-primary/10')} onClick={() => toggle(c.codigo_caja)}>
+                <TableCell><input type="checkbox" className="h-4 w-4 accent-primary" checked={sel.has(c.codigo_caja)} onChange={() => toggle(c.codigo_caja)} onClick={e => e.stopPropagation()} aria-label={`Marcar ${c.codigo_caja}`} /></TableCell>
+                <TableCell className="font-mono font-bold">{c.codigo_caja}</TableCell>
+                <TableCell>{c.nombre_equipo}</TableCell>
+                <TableCell><Badge variant={varianteEstado(c.estado_nuevo)}>{nombreEstado(c.estado_nuevo)}</Badge></TableCell>
+                <TableCell><div className="w-40 overflow-hidden rounded-sm" dangerouslySetInnerHTML={{ __html: svgSeguro(c.codigo_caja, { alto: 28, modulo: 1 }) }} /></TableCell>
+              </TableRow>
             ))}
             {visibles.length === 0 && !error && (
-              <tr><td colSpan="5" className="p-6 text-center text-slate-400">No hay cajas que coincidan.</td></tr>
+              <TableRow className="hover:bg-transparent"><TableCell colSpan="5" className="py-8 text-center text-muted-foreground">No hay cajas que coincidan.</TableCell></TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
-    </section>
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
   );
 }
