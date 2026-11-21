@@ -357,23 +357,25 @@ function ReporteVinculos() {
   );
 }
 
-export default function Reportes() {
+export default function Reportes({ user }) {
   const [tab, setTab] = useState('trazabilidad');
+  const tabsPermitidas = TABS.filter(t => t.id !== 'vinculos' || ['Enfermera', 'IT'].includes(user?.role));
+  const tabActiva = tabsPermitidas.some(t => t.id === tab) ? tab : tabsPermitidas[0].id;
 
   return (
     <section className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">Reportes de Gestión</h2>
-        <p className="text-muted-foreground text-sm">Trazabilidad, solicitudes, alertas y vínculos clínicos, filtrables y exportables a CSV.</p>
+        <p className="text-muted-foreground text-sm">Filtrables por fecha y exportables a CSV.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {TABS.map(t => (
+        {tabsPermitidas.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-              tab === t.id ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground border border-border hover:bg-muted/40'
+              tabActiva === t.id ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground border border-border hover:bg-muted/40'
             }`}
           >
             <i className={`fa-solid ${t.icon}`}></i> {t.label}
@@ -381,10 +383,10 @@ export default function Reportes() {
         ))}
       </div>
 
-      {tab === 'trazabilidad' && <ReporteTrazabilidad />}
-      {tab === 'solicitudes' && <ReporteSolicitudes />}
-      {tab === 'alertas' && <ReporteAlertas />}
-      {tab === 'vinculos' && <ReporteVinculos />}
+      {tabActiva === 'trazabilidad' && <ReporteTrazabilidad />}
+      {tabActiva === 'solicitudes' && <ReporteSolicitudes />}
+      {tabActiva === 'alertas' && <ReporteAlertas />}
+      {tabActiva === 'vinculos' && <ReporteVinculos />}
     </section>
   );
 }

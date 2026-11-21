@@ -37,6 +37,7 @@ const fecha = (d) => new Date(d).toLocaleString('es-CL', { day: '2-digit', month
 
 export default function Dashboard({ user }) {
   const navigate = useNavigate();
+  const puedeEntregar = ['TENS', 'IT'].includes(user?.role);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', items: [] });
   const [data, setData] = useState({
@@ -184,7 +185,9 @@ export default function Dashboard({ user }) {
       <Card id="pedidos" className="scroll-mt-4">
         <CardHeader>
           <CardTitle>Pedidos de pabellón por atender</CardTitle>
-          <CardDescription>Los 5 más recientes. Entregar abre la pantalla de entrega con el pedido cargado.</CardDescription>
+          <CardDescription>
+            Los 5 más recientes.{puedeEntregar && ' Entregar abre la pantalla de entrega con el pedido cargado.'}
+          </CardDescription>
         </CardHeader>
         <Table>
           <TableHeader>
@@ -194,7 +197,7 @@ export default function Dashboard({ user }) {
               <TableHead>Tipo</TableHead>
               <TableHead>Caja pedida</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acción</TableHead>
+              {puedeEntregar && <TableHead className="text-right">Acción</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -207,14 +210,16 @@ export default function Dashboard({ user }) {
                 </TableCell>
                 <TableCell className="max-w-xs">{cajaPedida(c.caja_requerida)}</TableCell>
                 <TableCell><Badge variant="info">{c.estado_actual}</Badge></TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" onClick={() => navigate(`/vinculo?solicitud=${c.solicitud_id}`)}>Entregar</Button>
-                </TableCell>
+                {puedeEntregar && (
+                  <TableCell className="text-right">
+                    <Button size="sm" onClick={() => navigate(`/vinculo?solicitud=${c.solicitud_id}`)}>Entregar</Button>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
             {data.criticas.length === 0 && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan="6" className="py-8 text-center text-muted-foreground">No hay pedidos pendientes.</TableCell>
+                <TableCell colSpan={puedeEntregar ? 6 : 5} className="py-8 text-center text-muted-foreground">No hay pedidos pendientes.</TableCell>
               </TableRow>
             )}
           </TableBody>

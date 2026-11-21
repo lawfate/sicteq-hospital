@@ -236,7 +236,7 @@ export default function Autoclave({ user }) {
                     )}
                   </div>
                 ) : (
-                  <p className="rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">Solo Enfermería puede liberar o rechazar la carga.</p>
+                  <p className="rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">Carga en proceso: Enfermería registra el resultado al terminar el ciclo.</p>
                 ))}
               </CardContent>
             </Card>

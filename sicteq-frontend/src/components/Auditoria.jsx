@@ -43,8 +43,7 @@ function Tarjeta({ icono, color, titulo, valor }) {
   );
 }
 
-export default function Auditoria({ user }) {
-  const esIT = user?.role === 'IT';
+export default function Auditoria() {
   const [filtro, setFiltro] = useState({ accion: '', desde: '', hasta: '' });
   const [filas, setFilas] = useState([]);
   const [error, setError] = useState('');
@@ -61,22 +60,11 @@ export default function Auditoria({ user }) {
   }, []);
 
   useEffect(() => {
-    if (!esIT) return;
     apiFetch('/api/auditoria?limite=1000')
       .then(async r => (r.ok ? r.json() : Promise.reject(new Error((await r.json().catch(() => ({}))).error || `Error del servidor (${r.status})`))))
       .then(setFilas)
       .catch(e => setError(e.message));
-  }, [esIT]);
-
-  if (!esIT) {
-    return (
-      <div className="max-w-xl mx-auto mt-10 bg-card border border-border rounded-lg p-8 text-center space-y-3">
-        <div className="w-14 h-14 rounded-full bg-danger/15 text-danger flex items-center justify-center mx-auto text-2xl"><i className="fa-solid fa-lock"></i></div>
-        <h3 className="font-bold text-foreground">Acceso restringido</h3>
-        <p className="text-sm text-muted-foreground">Tu perfil ({user?.role}) no puede ver el registro de auditoría. Solo el rol IT tiene acceso.</p>
-      </div>
-    );
-  }
+  }, []);
 
   const onBuscar = async () => { setCargando(true); await buscar(filtro); setCargando(false); };
   const contar = (a) => filas.filter(f => f.accion === a).length;
