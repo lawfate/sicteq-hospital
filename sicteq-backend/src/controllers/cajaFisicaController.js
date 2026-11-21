@@ -1,6 +1,79 @@
 const db = require('../config/db');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { entero } = require('../utils/validacion');
+const { ROLES } = require('../middleware/authMiddleware');
+
+// Historia completa de una caja, con datos clínicos según el rol.
+const getHojaVida = async (req, res) => {
+    const codigo = String(req.params.codigo || '').trim().toUpperCase();
+    if (!codigo) return res.status(400).json({ error: 'Código de caja inválido' });
+
+    try {
+        const cajaRes = await db.query(`
+            SELECT cf.id, cf.codigo_caja, cf.estado, i.nombre_equipo AS tipo,
+                   i.codigo_barra AS tipo_codigo, i.piezas, e.codigo AS estante,
+                   cf.fecha_creacion, cf.fecha_eliminacion, cf.fecha_caducidad
+            FROM caja_fisica cf
+            JOIN inventario i ON i.id = cf.inventario_id
+            LEFT JOIN estante e ON e.id = cf.estante_id
+            WHERE cf.codigo_caja = $1
+        `, [codigo]);
+        if (!cajaRes.rowCount) return res.status(404).json({ error: 'Caja no encontrada' });
+
+        const { id, ...caja } = cajaRes.rows[0];
+        const verPacientes = ROLES.datosPaciente.includes(req.user.rol);
+        const [movimientos, cargas, incidencias, pacientes] = await Promise.all([
+            db.query(`
+                SELECT h.fecha_cambio, h.estado_nuevo, h.justificacion, u.nombre AS usuario,
+                       a.nombre AS destino, h.metodo_esterilizacion, h.temperatura,
+                       h.presion, h.tiempo_minutos, h.piezas_contadas
+                FROM historial_movimiento h
+                LEFT JOIN usuario u ON u.id = h.usuario_id
+                LEFT JOIN area a ON a.id = h.area_destino_id
+                WHERE h.caja_fisica_id = $1
+                ORDER BY h.fecha_cambio ASC, h.id ASC
+            `, [id]),
+            db.query(`
+                SELECT 'M' || c.numero_maquina || '-C' || c.numero_ciclo AS carga,
+                       c.fecha_inicio, c.fecha_fin, c.estado, c.metodo, c.temperatura,
+                       c.presion, c.tiempo_minutos, c.observacion
+                FROM ciclo_esterilizacion c
+                WHERE EXISTS (SELECT 1 FROM vinculo_trazabilidad v
+                              WHERE v.ciclo_id = c.id AND v.caja_fisica_id = $1)
+                ORDER BY c.fecha_inicio ASC, c.id ASC
+            `, [id]),
+            db.query(`
+                SELECT fecha, piezas_esperadas, piezas_contadas, detalle, resolucion, fecha_resolucion
+                FROM incidencia WHERE caja_fisica_id = $1
+                ORDER BY fecha ASC, id ASC
+            `, [id]),
+            verPacientes ? db.query(`
+                SELECT v.fecha_vinculo, p.rut, p.nombre
+                FROM vinculo_caja_paciente v
+                JOIN paciente p ON p.id = v.paciente_id
+                WHERE v.caja_fisica_id = $1
+                ORDER BY v.fecha_vinculo ASC, p.id ASC
+            `, [id]) : Promise.resolve(null),
+        ]);
+
+        res.json({
+            caja,
+            movimientos: movimientos.rows,
+            cargas: cargas.rows,
+            incidencias: incidencias.rows,
+            ...(verPacientes ? { pacientes: pacientes.rows } : {}),
+            resumen: {
+                ciclos_completos: movimientos.rows.filter(m => m.estado_nuevo === 'Despachado').length,
+                esterilizaciones: cargas.rows.filter(c => c.estado === 'Estéril').length,
+                reprocesos: cargas.rows.filter(c => c.estado === 'No estéril').length,
+                incidencias: incidencias.rows.length,
+            },
+        });
+    } catch (err) {
+        console.error('Error al cargar hoja de vida:', err);
+        res.status(500).json({ error: 'Error al cargar hoja de vida' });
+    }
+};
 
 // Cajas físicas en circulación: cada fila es una unidad individual
 // (codigo_caja, ej. CAJA-0045), no un tipo/categoría (eso es INVENTARIO).
@@ -202,4 +275,4 @@ const ubicarCaja = async (req, res) => {
     }
 };
 
-module.exports = { getCajasEnCirculacion, getPacientesDeCaja, getCajas, getCaja, crearCaja, darBaja, ubicarCaja };
+module.exports = { getHojaVida, getCajasEnCirculacion, getPacientesDeCaja, getCajas, getCaja, crearCaja, darBaja, ubicarCaja };

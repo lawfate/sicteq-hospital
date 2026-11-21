@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
 import { toCSV } from '../csv';
+import { descargarXlsx } from '../xlsx';
 import { nombreEstado } from '@/etapas';
 
 const TABS = [
   { id: 'trazabilidad', label: 'Trazabilidad', icon: 'fa-route' },
   { id: 'solicitudes', label: 'Solicitudes', icon: 'fa-clipboard-list' },
   { id: 'alertas', label: 'Alertas', icon: 'fa-triangle-exclamation' },
-  { id: 'vinculos', label: 'Vínculos Clínicos', icon: 'fa-user-injured' }
+  { id: 'vinculos', label: 'Vínculos Clínicos', icon: 'fa-user-injured' },
+  { id: 'tiempos', label: 'Tiempos por etapa', icon: 'fa-stopwatch' }
 ];
 
 const ESTADOS_SOLICITUD = ['Pendiente', 'En Preparación', 'Listo', 'Despachado'];
@@ -57,18 +59,30 @@ function Field({ label, children }) {
 
 const inputCls = "p-2 border border-border rounded-lg text-sm";
 
-function ReportTable({ columns, rows, emptyMessage, onExport }) {
+// Excel recibe lo mismo que se ve en pantalla (fechas legibles, etapas con nombre).
+const legibles = (rows, columns) => rows.map(r => Object.fromEntries(columns.map(c => [c.key, c.render ? c.render(r) : r[c.key]])));
+
+function ReportTable({ columns, rows, emptyMessage, archivo }) {
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-muted/40">
         <h3 className="font-bold text-foreground text-sm">{rows.length} resultado{rows.length === 1 ? '' : 's'}</h3>
-        <button
-          onClick={onExport}
-          disabled={rows.length === 0}
-          className="bg-ok text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-ok/90 disabled:opacity-40 flex items-center gap-2"
-        >
-          <i className="fa-solid fa-file-csv"></i> Exportar CSV
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => descargarXlsx(`${archivo}.xlsx`, legibles(rows, columns), columns)}
+            disabled={rows.length === 0}
+            className="bg-ok text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-ok/90 disabled:opacity-40 flex items-center gap-2"
+          >
+            <i className="fa-solid fa-file-excel"></i> Exportar Excel
+          </button>
+          <button
+            onClick={() => downloadCSV(`${archivo}.csv`, rows, columns)}
+            disabled={rows.length === 0}
+            className="border border-border px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-muted disabled:opacity-40 flex items-center gap-2"
+          >
+            <i className="fa-solid fa-file-csv"></i> CSV
+          </button>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-muted-foreground min-w-[720px]">
@@ -152,7 +166,7 @@ function ReporteTrazabilidad() {
         columns={columns}
         rows={rows}
         emptyMessage="No hay movimientos que coincidan con los filtros."
-        onExport={() => downloadCSV('trazabilidad.csv', rows, columns)}
+        archivo="trazabilidad"
       />
     </div>
   );
@@ -224,7 +238,7 @@ function ReporteSolicitudes() {
         columns={columns}
         rows={rows}
         emptyMessage="No hay solicitudes que coincidan con los filtros."
-        onExport={() => downloadCSV('solicitudes.csv', rows, columns)}
+        archivo="solicitudes"
       />
     </div>
   );
@@ -280,7 +294,7 @@ function ReporteAlertas() {
           columns={colsStock}
           rows={stockBajo}
           emptyMessage="Sin alertas de stock en este momento."
-          onExport={() => downloadCSV('alertas-stock.csv', stockBajo, colsStock)}
+          archivo="alertas-stock"
         />
       </div>
       <div>
@@ -289,7 +303,7 @@ function ReporteAlertas() {
           columns={colsVencer}
           rows={cajasPorVencer}
           emptyMessage="Sin cajas próximas a vencer en este momento."
-          onExport={() => downloadCSV('alertas-vencimiento.csv', cajasPorVencer, colsVencer)}
+          archivo="alertas-vencimiento"
         />
       </div>
     </div>
@@ -351,8 +365,65 @@ function ReporteVinculos() {
         columns={columns}
         rows={rows}
         emptyMessage="No hay vínculos clínicos que coincidan con los filtros."
-        onExport={() => downloadCSV('vinculos-clinicos.csv', rows, columns)}
+        archivo="vinculos-clinicos"
       />
+    </div>
+  );
+}
+
+// 135 -> "2 h 15 min": la Central piensa en horas, no en minutos sueltos.
+const duracion = (min) => {
+  if (min === null || min === undefined) return '—';
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  if (h >= 48) return `${Math.round(h / 24)} días`;
+  return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`;
+};
+
+function ReporteTiempos() {
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const columns = [
+    { key: 'estado', label: 'Etapa', render: r => nombreEstado(r.estado) },
+    { key: 'veces', label: 'Veces' },
+    { key: 'mediana_min', label: 'Tiempo habitual (mediana)', render: r => duracion(r.mediana_min) },
+    { key: 'p90_min', label: '9 de cada 10 tardan menos de', render: r => duracion(r.p90_min) },
+    { key: 'promedio_min', label: 'Promedio', render: r => duracion(r.promedio_min) },
+  ];
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (desde) params.set('desde', desde);
+      if (hasta) params.set('hasta', `${hasta} 23:59:59`);
+      const res = await apiFetch(`/api/reportes/tiempos?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo calcular el reporte.');
+      setRows(Array.isArray(data) ? data : []);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial; load cambia estado tras el await
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">Cuánto tiempo pasa una caja en cada etapa antes de pasar a la siguiente. "En pabellón" es desde que se entrega hasta que vuelve a Recepción.</p>
+      <FilterBar onApply={load} loading={loading}>
+        <Field label="Desde"><input type="date" className={inputCls} value={desde} onChange={e => setDesde(e.target.value)} /></Field>
+        <Field label="Hasta"><input type="date" className={inputCls} value={hasta} onChange={e => setHasta(e.target.value)} /></Field>
+      </FilterBar>
+      {error && <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>}
+      <ReportTable columns={columns} rows={rows} emptyMessage="No hay movimientos en ese rango." archivo="tiempos-por-etapa" />
     </div>
   );
 }
@@ -366,7 +437,7 @@ export default function Reportes({ user }) {
     <section className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">Reportes de Gestión</h2>
-        <p className="text-muted-foreground text-sm">Filtrables por fecha y exportables a CSV.</p>
+        <p className="text-muted-foreground text-sm">Filtrables por fecha y exportables a Excel o CSV.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -387,6 +458,7 @@ export default function Reportes({ user }) {
       {tabActiva === 'solicitudes' && <ReporteSolicitudes />}
       {tabActiva === 'alertas' && <ReporteAlertas />}
       {tabActiva === 'vinculos' && <ReporteVinculos />}
+      {tabActiva === 'tiempos' && <ReporteTiempos />}
     </section>
   );
 }

@@ -4,6 +4,7 @@ import Modal from './Modal';
 import Estacion from './Estacion';
 import { apiFetch, moverCaja, fichaCaja } from '../api';
 import { bip } from '../sonido';
+import { imprimirHojaVida } from '../hojaVida';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -268,6 +269,10 @@ export default function Ciclo() {
                   {ficha && <CardDescription>{ficha.tipo}{ficha.piezas ? ` · ${ficha.piezas} piezas` : ''}</CardDescription>}
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Button variant="secondary" size="sm" onClick={async () => {
+                    const error = await imprimirHojaVida(activeBox.codigo);
+                    if (error) setAvance({ codigo: activeBox.codigo, ok: false, mensaje: error });
+                  }}>Hoja de vida</Button>
                   {ficha?.estante && <Badge variant="ok" className="px-3 py-1 font-mono text-sm">{ficha.estante}</Badge>}
                   <Badge variant="info" className="px-3 py-1 text-sm">{ETAPAS.find(e => e.id === activeBox.stage)?.nombre}</Badge>
                 </div>

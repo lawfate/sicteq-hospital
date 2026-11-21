@@ -26,7 +26,7 @@ export const SECCIONES = [
     titulo: 'Gestión',
     items: [
       { ruta: '/indicadores', nombre: 'Indicadores', icono: 'fa-gauge-high', ayuda: 'Metas del proyecto' },
-      { ruta: '/reportes', nombre: 'Reportes', icono: 'fa-file-lines', ayuda: 'Exportar a Excel (CSV)', roles: ['Enfermera', 'IT'] },
+      { ruta: '/reportes', nombre: 'Reportes', icono: 'fa-file-lines', ayuda: 'Exportar a Excel o CSV', roles: ['Enfermera', 'IT'] },
       { ruta: '/usuarios', nombre: 'Usuarios', icono: 'fa-users-gear', ayuda: 'Crear cuentas y resetear claves', roles: ['IT'] },
       { ruta: '/auditoria', nombre: 'Auditoría', icono: 'fa-user-shield', ayuda: 'Quién hizo qué y cuándo', roles: ['IT'] },
     ],
