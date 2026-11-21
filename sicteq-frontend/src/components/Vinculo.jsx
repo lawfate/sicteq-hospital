@@ -1,30 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 
 export default function Vinculo({ user }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  // Capturamos si viene un ID de solicitud desde el Dashboard
-  const queryParams = new URLSearchParams(location.search);
-  const solicitudId = queryParams.get('solicitud');
-
-  // Si hay solicitud, estamos en modo "Despacho" (TENS). Si no, en modo "Clínico" (Enfermera)
-  const isDespachoMode = Boolean(solicitudId);
-
+  // Vínculo caja-paciente (Enfermería, IT). La entrega a pabellón vive en Entrega.jsx.
   const [searchTerm, setSearchTerm] = useState('');
   const [pacientes, setPacientes] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [cajaCode, setCajaCode] = useState('');
-  const [status, setStatus] = useState({ loading: false, message: '', type: '' });
   const [vinculoStatus, setVinculoStatus] = useState({ loading: false, message: '', type: '' });
-
-  // TENS despacha (llega con ?solicitud desde el Panel); Enfermería vincula con paciente.
-  const isAuthorized =
-    user?.role === 'IT' ||
-    (user?.role === 'Enfermera' && !isDespachoMode) ||
-    (user?.role === 'TENS' && isDespachoMode);
 
   const loadPacientes = () => {
     apiFetch(`/api/pacientes`)
@@ -34,10 +17,8 @@ export default function Vinculo({ user }) {
   };
 
   useEffect(() => {
-    if (isAuthorized && !isDespachoMode) {
-      loadPacientes();
-    }
-  }, [isAuthorized, isDespachoMode]);
+    loadPacientes();
+  }, []);
 
   // Sin texto de búsqueda mostramos todos los pacientes (para poder verlos,
   // no solo encontrarlos escribiendo); con texto, filtramos por RUT o nombre.
@@ -89,83 +70,11 @@ export default function Vinculo({ user }) {
     }
   };
 
-  // Acción 2: Despacho de Caja (TENS)
-  const handleDespacho = async (e) => {
-    e.preventDefault();
-    if (!cajaCode) return alert("ERROR: Ingrese el código o folio de la caja a despachar.");
-
-    setStatus({ loading: true, message: '', type: '' });
-
-    try {
-      const response = await apiFetch(`/api/solicitudes/${solicitudId}/despachar`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caja_codigo: cajaCode, usuario_id: user.id })
-      });
-
-      // Mostrar el motivo real (p. ej. carga No estéril o empaque vencido), no un error genérico.
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Error al despachar la solicitud');
-
-      setStatus({ loading: false, message: '¡Caja despachada con éxito a Pabellón!', type: 'success' });
-
-      // Volver al Dashboard después de 2 segundos para ver que desapareció de la lista
-      setTimeout(() => navigate('/'), 2000);
-
-    } catch (error) {
-      setStatus({ loading: false, message: error.message, type: 'error' });
-    }
-  };
-
-  // Fuera de su tarea no se muestra nada: TENS sin pedido vuelve al Panel (ahí elige qué entregar)
-  // y Enfermería que abre un despacho pasa a su vista de vínculo con paciente.
-  if (!isAuthorized) return <Navigate to={isDespachoMode ? '/vinculo' : '/'} replace />;
-
   return (
     <div className="space-y-6">
 
-      {/* Alertas de Éxito o Error del Despacho */}
-      {status.message && (
-        <div className={`p-4 rounded-lg text-sm font-medium text-center max-w-lg mx-auto ${status.type === 'success' ? 'bg-ok/15 text-ok border border-ok/40' : 'bg-danger/15 text-danger border border-danger/40'}`}>
-          {status.message}
-        </div>
-      )}
-
-      {/* VISTA 1: MODO DESPACHO */}
-      {isAuthorized && isDespachoMode && (
-        <div className="rounded-lg border border-border bg-card p-6 space-y-5 max-w-lg mx-auto">
-            <div className="border-b border-border pb-3 text-center">
-                <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center text-xl mx-auto mb-3"><i className="fa-solid fa-truck-medical"></i></div>
-                <h3 className="font-bold text-foreground text-lg">Despacho de Instrumental</h3>
-                <p className="text-xs text-muted-foreground mt-1">Asignando caja física a la Solicitud <span className="font-bold text-primary">REQ-{solicitudId}</span></p>
-            </div>
-
-            <form onSubmit={handleDespacho} className="space-y-6">
-                <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-muted-foreground uppercase text-center">Escanee o Digite el Código de la Caja</label>
-                    <input
-                        type="text"
-                        placeholder="Ej: CAJA-LAP-042"
-                        className="p-3 border border-border rounded-lg text-center text-lg bg-muted/40 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-primary uppercase"
-                        value={cajaCode}
-                        onChange={(e) => setCajaCode(e.target.value.toUpperCase())}
-                    />
-                </div>
-
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => navigate('/')} className="w-1/3 bg-muted hover:bg-muted text-muted-foreground font-bold py-3 rounded-lg text-xs transition-colors">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={status.loading} className="w-2/3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-bold py-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-2">
-                      {status.loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                      Despachar a Pabellón
-                  </button>
-                </div>
-            </form>
-        </div>
-      )}
-
-      {/* VISTA 2: MODO VÍNCULO CLÍNICO */}
-      {isAuthorized && !isDespachoMode && (
+      {/* Vínculo clínico */}
+      {(
         <div className="space-y-6">
 
           {/* Sección de pacientes: buscador + listado visible con estado de vínculo */}

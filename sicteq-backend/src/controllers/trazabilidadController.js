@@ -52,7 +52,8 @@ const etapaDe = (estado) => {
 
 const actualizarEtapa = async (req, res) => {
     const codigo = String(req.body.codigo || '').trim().toUpperCase();
-    const { stage, reason, metodo, temperatura, presion, tiempoMinutos, vigenciaDias } = req.body;
+    const { stage, vigenciaDias } = req.body;
+    let { reason, metodo, temperatura, presion, tiempoMinutos } = req.body;
 
     // Validación de campos requeridos. El motivo (reason) es opcional al avanzar
     // de etapa -- el frontend solo lo exige para retrocesos; si viene vacío se usa
@@ -90,17 +91,11 @@ const actualizarEtapa = async (req, res) => {
         const esRetroceso = etapaActual !== null && etapaNueva < etapaActual;
 
         if (!esRetroceso && (etapaNueva === ALMACENAMIENTO_STAGE_ID || etapaNueva === ENTREGA_STAGE_ID)) {
-            // Requerimiento 1: antes esta regla vivía solo en Ciclo.jsx y se
-            // saltaba llamando directo a la API.
-            const hayParametros = [temperatura, presion, tiempoMinutos].some(v => v !== undefined && v !== null && String(v).trim() !== '');
-            if (!hayParametros && !(reason || '').trim()) {
-                return res.status(400).json({ error: 'Para pasar a Almacenamiento o Entrega se requieren los parámetros de esterilización o un comentario que justifique su ausencia.' });
-            }
-
             // PB-04: una caja solo avanza si su carga más reciente fue liberada
             // como "Estéril". Una carga En proceso o No estéril la bloquea.
             const carga = await db.query(`
-                SELECT c.id, c.numero_maquina, c.numero_ciclo, c.estado
+                SELECT c.id, c.numero_maquina, c.numero_ciclo, c.estado,
+                       c.metodo, c.temperatura, c.presion, c.tiempo_minutos
                 FROM vinculo_trazabilidad v
                 JOIN ciclo_esterilizacion c ON c.id = v.ciclo_id
                 WHERE v.caja_fisica_id = $1
@@ -112,16 +107,27 @@ const actualizarEtapa = async (req, res) => {
                 await registrarAuditoria(req, 'etapa_bloqueada', 'caja_fisica', codigo, { etapa: etapaNueva, carga: `M${ultima.numero_maquina}-C${ultima.numero_ciclo}`, estado_carga: ultima.estado });
                 return res.status(409).json({ error: `La caja ${codigo} pertenece a la carga M${ultima.numero_maquina}-C${ultima.numero_ciclo} con estado "${ultima.estado}". No puede pasar a Almacenamiento ni Entrega hasta que una carga suya sea liberada como Estéril.` });
             }
+
+            const hayParametros = [temperatura, presion, tiempoMinutos].some(v => v !== undefined && v !== null && String(v).trim() !== '');
+            if (!hayParametros && !(reason || '').trim()) {
+                // Al ingresar a bodega, reutilizamos la carga liberada.
+                if (etapaNueva === ALMACENAMIENTO_STAGE_ID && ultima?.estado === 'Estéril') {
+                    metodo = ultima.metodo;
+                    temperatura = ultima.temperatura;
+                    presion = ultima.presion;
+                    tiempoMinutos = ultima.tiempo_minutos;
+                    reason = `Ingreso a bodega estéril — carga M${ultima.numero_maquina}-C${ultima.numero_ciclo}`;
+                } else {
+                    return res.status(400).json({ error: 'Para pasar a Almacenamiento o Entrega se requieren los parámetros de esterilización o un comentario que justifique su ausencia.' });
+                }
+            }
         }
 
         // Formatear el estado y la justificación
         const estadoFormateado = `Etapa ${etapaNueva}`;
         const justificacionFinal = (reason || '').trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
 
-        // Los parámetros del ciclo de esterilización (método/temperatura/presión/
-        // tiempo) solo llegan cuando el frontend los manda -- es decir, cuando la
-        // etapa que se está registrando es "Esterilización". Para cualquier otra
-        // etapa quedan en null.
+        // Parámetros recibidos o heredados de la carga al ingresar a bodega.
         const query = `
             INSERT INTO HISTORIAL_MOVIMIENTO
             (inventario_id, caja_fisica_id, estado_anterior, estado_nuevo, fecha_cambio, area_destino_id, justificacion,

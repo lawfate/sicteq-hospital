@@ -16,7 +16,7 @@ const ACCIONES = {
   TENS: [
     { ruta: '/ciclo', texto: 'Recibir o mover una caja', icono: 'fa-barcode' },
     { ruta: '/autoclave', texto: 'Armar carga de autoclave', icono: 'fa-temperature-high' },
-    { ancla: 'pedidos', texto: 'Entregar pedidos de pabellón', icono: 'fa-truck-medical' },
+    { ruta: '/entrega', texto: 'Entregar pedidos de pabellón', icono: 'fa-truck-medical' },
     { ruta: '/etiquetas', texto: 'Imprimir etiquetas', icono: 'fa-tags' },
   ],
   Enfermera: [
@@ -67,7 +67,8 @@ export default function Dashboard({ user }) {
       .then(res => res.json())
       .then(json => setAlertas({
         stockBajo: Array.isArray(json.stockBajo) ? json.stockBajo : [],
-        cajasPorVencer: Array.isArray(json.cajasPorVencer) ? json.cajasPorVencer : []
+        cajasPorVencer: Array.isArray(json.cajasPorVencer) ? json.cajasPorVencer : [],
+        cargasDemoradas: Array.isArray(json.cargasDemoradas) ? json.cargasDemoradas : []
       }))
       .catch(err => console.error("Error cargando alertas:", err));
   }, []);
@@ -98,7 +99,7 @@ export default function Dashboard({ user }) {
     { titulo: 'Pedidos pendientes', valor: data.stats.solicitudes_pendientes, nota: 'Aún no entregados a pabellón', alerta: data.stats.solicitudes_pendientes > 0 },
     { titulo: 'Stock en alerta', valor: data.stats.alertas_stock, nota: 'Tipos de caja bajo el mínimo', alerta: data.stats.alertas_stock > 0 },
   ];
-  const hayAlertas = alertas && (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0);
+  const hayAlertas = alertas && (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0 || alertas.cargasDemoradas.length > 0);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
@@ -108,7 +109,7 @@ export default function Dashboard({ user }) {
             <Button
               key={a.texto}
               variant="secondary"
-              onClick={() => (a.ruta ? navigate(a.ruta) : document.getElementById(a.ancla)?.scrollIntoView({ behavior: 'smooth' }))}
+              onClick={() => navigate(a.ruta)}
             >
               <i className={`fa-solid ${a.icono}`} aria-hidden="true"></i>{a.texto}
             </Button>
@@ -133,9 +134,28 @@ export default function Dashboard({ user }) {
         {alertas === null ? (
           <p className="text-sm text-muted-foreground"><i className="fa-solid fa-circle-notch fa-spin mr-2" aria-hidden="true"></i>Revisando stock y vencimientos…</p>
         ) : !hayAlertas ? (
-          <p className="rounded-lg border border-ok/40 bg-ok/10 px-5 py-4 font-bold text-ok">Todo en orden: no hay stock bajo ni empaques por vencer.</p>
+          <p className="rounded-lg border border-ok/40 bg-ok/10 px-5 py-4 font-bold text-ok">Todo en orden: no hay stock bajo, empaques por vencer ni cargas demoradas.</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
+            {alertas.cargasDemoradas.length > 0 && (
+              <Card className="md:col-span-2">
+                <CardHeader className="flex-row items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle>Cargas de autoclave sin resultado</CardTitle>
+                    <CardDescription>Un ciclo dura cerca de 2 horas: estas llevan más de 3 en proceso.</CardDescription>
+                  </div>
+                  <Badge variant="danger">{alertas.cargasDemoradas.length}</Badge>
+                </CardHeader>
+                <CardContent className="max-h-72 overflow-y-auto p-0">
+                  {alertas.cargasDemoradas.map(c => (
+                    <button key={c.id} onClick={() => navigate('/autoclave')} className="flex w-full items-center justify-between gap-3 border-t border-border px-5 py-3 text-left hover:bg-muted/40">
+                      <span className="font-mono font-bold">M{c.numero_maquina}-C{c.numero_ciclo}</span>
+                      <Badge variant="warn">{c.horas >= 48 ? `Hace ${Math.floor(c.horas / 24)} días` : `Hace ${c.horas} h`}</Badge>
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>Empaques por vencer</CardTitle>
@@ -182,7 +202,7 @@ export default function Dashboard({ user }) {
       </section>
 
       {/* Pedidos de pabellón por atender */}
-      <Card id="pedidos" className="scroll-mt-4">
+      <Card>
         <CardHeader>
           <CardTitle>Pedidos de pabellón por atender</CardTitle>
           <CardDescription>
@@ -212,7 +232,7 @@ export default function Dashboard({ user }) {
                 <TableCell><Badge variant="info">{c.estado_actual}</Badge></TableCell>
                 {puedeEntregar && (
                   <TableCell className="text-right">
-                    <Button size="sm" onClick={() => navigate(`/vinculo?solicitud=${c.solicitud_id}`)}>Entregar</Button>
+                    <Button size="sm" onClick={() => navigate(`/entrega?solicitud=${c.solicitud_id}`)}>Entregar</Button>
                   </TableCell>
                 )}
               </TableRow>

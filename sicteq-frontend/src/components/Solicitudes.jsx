@@ -3,17 +3,26 @@ import { apiFetch } from '../api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, Textarea, Label } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const TIPOS = ['Programada', 'Urgencia Médica'];
 
+const obtenerPedidos = async () => {
+  const response = await apiFetch(`/api/solicitudes?mios=1&limite=20`);
+  if (!response.ok) throw new Error('No se pudo cargar los pedidos.');
+  return response.json();
+};
+
 // Importante: Recibimos el 'user' como prop (la enfermera conectada)
 export default function Solicitudes({ user }) {
   const [areas, setAreas] = useState([]);
+  const [inventario, setInventario] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
   const [formData, setFormData] = useState({
     cirugia: 'Programada',
     area_id: '',
-    instrumental: 'Set Estándar de Cesárea',
+    inventario_id: '',
     obs: ''
   });
   const [status, setStatus] = useState({ loading: false, message: '', type: '' });
@@ -27,7 +36,37 @@ export default function Solicitudes({ user }) {
         if (data.length > 0) setFormData(prev => ({ ...prev, area_id: data[0].id }));
       })
       .catch(err => console.error("Error al cargar áreas:", err));
+
+    apiFetch(`/api/inventario`)
+      .then(res => res.json())
+      .then(data => {
+        setInventario(data);
+        if (data.length > 0) setFormData(prev => ({ ...prev, inventario_id: data[0].id }));
+      })
+      .catch(err => console.error("Error al cargar inventario:", err));
+
+    obtenerPedidos()
+      .then(setPedidos)
+      .catch(err => console.error('Error al cargar pedidos:', err));
   }, []);
+
+  const formatoFecha = (fecha) => {
+    if (!fecha) return '—';
+    const fechaObj = new Date(fecha);
+    if (Number.isNaN(fechaObj.getTime())) return '—';
+    const dia = String(fechaObj.getDate()).padStart(2, '0');
+    const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
+    const hora = String(fechaObj.getHours()).padStart(2, '0');
+    const minuto = String(fechaObj.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes} ${hora}:${minuto}`;
+  };
+
+  const varianteEstado = (estado) => {
+    if (estado === 'Despachado') return 'ok';
+    if (estado === 'Listo' || estado === 'En Preparación') return 'info';
+    if (estado === 'Pendiente') return 'warn';
+    return 'default';
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,18 +77,23 @@ export default function Solicitudes({ user }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          usuario_id: user.id,
           area_id: formData.area_id,
           tipo_cirugia: formData.cirugia,
-          instrumental: formData.instrumental,
+          inventario_id: formData.inventario_id,
           observaciones: formData.obs
         })
       });
 
-      if (!response.ok) throw new Error('No se pudo enviar el pedido. Intente de nuevo.');
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'No se pudo enviar el pedido. Intente de nuevo.');
+      }
 
       setStatus({ loading: false, message: 'Pedido enviado a la Central.', type: 'success' });
       setFormData({ ...formData, obs: '' });
+      obtenerPedidos()
+        .then(setPedidos)
+        .catch(err => console.error('Error al cargar pedidos:', err));
       setTimeout(() => setStatus({ loading: false, message: '', type: '' }), 4000);
     } catch (error) {
       setStatus({ loading: false, message: error.message, type: 'error' });
@@ -57,7 +101,7 @@ export default function Solicitudes({ user }) {
   };
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-3xl space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Nuevo pedido de cajas para pabellón</CardTitle>
@@ -101,10 +145,10 @@ export default function Solicitudes({ user }) {
 
             <div className="space-y-1.5">
               <Label htmlFor="instrumental">Caja que necesita</Label>
-              <Select id="instrumental" value={formData.instrumental} onChange={(e) => setFormData({ ...formData, instrumental: e.target.value })}>
-                <option>Set Estándar de Cesárea</option>
-                <option>Set Colecistectomía Laparoscópica</option>
-                <option>Caja de Instrumental Mayor Cirugía General</option>
+              <Select id="instrumental" value={formData.inventario_id} onChange={(e) => setFormData({ ...formData, inventario_id: e.target.value })}>
+                {inventario.map(item => (
+                  <option key={item.id} value={item.id}>{item.nombre_equipo}</option>
+                ))}
               </Select>
             </div>
 
@@ -119,10 +163,43 @@ export default function Solicitudes({ user }) {
               </p>
             )}
 
-            <Button type="submit" size="lg" disabled={status.loading} className="w-full">
-              {status.loading ? <><i className="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Enviando…</> : 'Enviar pedido a la Central'}
+            <Button type="submit" size="lg" disabled={status.loading || !formData.inventario_id} className="w-full">
+              {status.loading ? 'Enviando…' : 'Enviar pedido a la Central'}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Mis pedidos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pedidos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Todavía no ha hecho pedidos.</p>
+          ) : (
+            <div>
+              {pedidos.map(pedido => (
+                <div key={pedido.id} className="border-b border-border py-3 last:border-b-0 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-mono text-sm font-bold text-foreground">REQ-{pedido.id}</p>
+                      <p className="mt-1 text-sm text-foreground">{pedido.caja_pedida || '—'}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {pedido.area_nombre} · {formatoFecha(pedido.fecha_creacion)}
+                      </p>
+                    </div>
+                    <Badge variant={varianteEstado(pedido.estado)}>
+                      {pedido.estado === 'Despachado' ? 'Entregado' : pedido.estado}
+                      {pedido.estado === 'Despachado' && pedido.caja_despachada && (
+                        <span className="font-mono"> · {pedido.caja_despachada}</span>
+                      )}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

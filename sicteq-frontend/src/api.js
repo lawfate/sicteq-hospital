@@ -23,3 +23,14 @@ export const apiFetch = (path, options = {}) => {
     return res;
   });
 };
+
+// Mueve una caja a una etapa. Devuelve { ok, mensaje } con el motivo real del servidor.
+export async function moverCaja(codigo, etapa, motivo = '') {
+  const r = await apiFetch('/api/trazabilidad/actualizar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codigo, stage: etapa, reason: motivo }),
+  });
+  const d = await r.json().catch(() => ({}));
+  return { ok: r.ok, mensaje: d.error || d.message || '' };
+}

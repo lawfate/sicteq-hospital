@@ -10,7 +10,8 @@ export const SECCIONES = [
       { ruta: '/ciclo', nombre: 'Seguimiento de cajas', icono: 'fa-barcode', ayuda: 'Recepción, lavado, preparación y bodega' },
       { ruta: '/autoclave', nombre: 'Cargas de autoclave', icono: 'fa-temperature-high', ayuda: 'Registrar y liberar cargas' },
       { ruta: '/solicitudes', nombre: 'Pedidos de pabellón', icono: 'fa-clipboard-list', ayuda: 'Pedir cajas para cirugías', roles: ['Enfermera', 'IT'] },
-      { ruta: '/vinculo', nombre: 'Entrega y paciente', icono: 'fa-hand-holding-medical', ayuda: 'Despachar y vincular con paciente', roles: ['Enfermera', 'IT'] },
+      { ruta: '/entrega', nombre: 'Entrega a pabellón', icono: 'fa-truck-medical', ayuda: 'Pedidos por entregar, urgencias primero', roles: ['TENS', 'IT'] },
+      { ruta: '/vinculo', nombre: 'Vínculo con paciente', icono: 'fa-hand-holding-medical', ayuda: 'Qué caja se usó con qué paciente', roles: ['Enfermera', 'IT'] },
     ],
   },
   {

@@ -5,8 +5,8 @@ const db = require('../config/db');
 // (o ya venció), para que el Dashboard las muestre sin navegar a ningún lado.
 const getAlertas = async (req, res) => {
     try {
-        // Las dos consultas son independientes: en paralelo (PB-08, prueba de carga).
-        const [stockBajo, cajasPorVencer] = await Promise.all([db.query(`
+        // Consultas independientes en paralelo (PB-08, prueba de carga).
+        const [stockBajo, cajasPorVencer, cargasDemoradas] = await Promise.all([db.query(`
             SELECT id, nombre_equipo, codigo_barra, cantidad_disponible, cantidad_total, stock_critico, estado_actual
             FROM inventario
             WHERE cantidad_disponible <= stock_critico OR estado_actual IN ('Alerta', 'Merma', 'En Reparación')
@@ -21,11 +21,18 @@ const getAlertas = async (req, res) => {
               AND cf.fecha_caducidad IS NOT NULL
               AND cf.fecha_caducidad <= NOW() + INTERVAL '7 days'
             ORDER BY cf.fecha_caducidad ASC
+        `), db.query(`
+            SELECT id, numero_maquina, numero_ciclo, fecha_inicio,
+                   FLOOR(EXTRACT(EPOCH FROM (NOW() - fecha_inicio)) / 3600)::int AS horas
+            FROM ciclo_esterilizacion
+            WHERE estado = 'En proceso' AND fecha_inicio < NOW() - INTERVAL '3 hours'
+            ORDER BY fecha_inicio ASC
         `)]);
 
         res.json({
             stockBajo: stockBajo.rows,
-            cajasPorVencer: cajasPorVencer.rows
+            cajasPorVencer: cajasPorVencer.rows,
+            cargasDemoradas: cargasDemoradas.rows
         });
     } catch (err) {
         console.error("Error al obtener alertas:", err);
