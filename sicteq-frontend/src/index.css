@@ -1,3 +1,37 @@
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Tema oscuro operativo SICTEQ (H S% L%). Fondo azul petróleo casi negro, un solo
+   color de acción (cian clínico) y colores solo para estados de la caja:
+   ok = estéril / lista, warn = en proceso / por vencer, danger = bloqueada / vencida. */
+@layer base {
+  :root {
+    color-scheme: dark;
+    --background: 210 30% 7%;
+    --card: 210 26% 11%;
+    --muted: 210 22% 16%;
+    --border: 210 18% 23%;
+    --foreground: 200 20% 93%;
+    --muted-foreground: 205 14% 64%;
+    --primary: 188 78% 46%;
+    --primary-foreground: 210 30% 7%;
+    --ok: 150 58% 46%;
+    --warn: 38 92% 56%;
+    --danger: 2 78% 62%;
+  }
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 16px;
+  }
+  :focus-visible { @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+}

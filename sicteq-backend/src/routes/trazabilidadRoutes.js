@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 // Importamos las funciones desde el controlador real
-const { buscarFolio, actualizarEtapa } = require('../controllers/trazabilidadController');
+const { buscarCaja, actualizarEtapa } = require('../controllers/trazabilidadController');
 
-router.get('/buscar/:id', buscarFolio);
+router.get('/buscar/:codigo', buscarCaja);
 router.post('/actualizar', actualizarEtapa);
 
 module.exports = router;

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input, Label } from '@/components/ui/input';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -7,9 +9,12 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Motivo del último cierre de sesión (lo deja api.js o el cierre por inactividad).
+  const [motivoSalida] = useState(() => sessionStorage.getItem('sicteq_motivo_salida'));
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    sessionStorage.removeItem('sicteq_motivo_salida');
     setError('');
     setIsLoading(true);
 
@@ -27,12 +32,19 @@ export default function Login({ onLogin }) {
         throw new Error(data.error || 'Error al conectar con el servidor');
       }
 
-      // Si es exitoso, pasamos el usuario real (que viene de la BD) a App.jsx
-      onLogin({
+      // Guardamos el token para que apiFetch lo adjunte a cada llamada, y
+      // para poder mantener la sesión si se recarga la página.
+      localStorage.setItem('sicteq_token', data.token);
+
+      const user = {
         id: data.user.id,
         name: data.user.nombre,
         role: data.user.rol
-      });
+      };
+      localStorage.setItem('sicteq_user', JSON.stringify(user));
+
+      // Si es exitoso, pasamos el usuario real (que viene de la BD) a App.jsx
+      onLogin(user);
 
     } catch (err) {
       setError(err.message);
@@ -42,67 +54,37 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md space-y-6 border border-slate-200">
-            <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-sm">
-                    <i className="fa-solid fa-hospital-user"></i>
-                </div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">SICTEQ</h1>
-                <p className="text-sm text-slate-500">Ingreso al Sistema de Esterilización - HFRZ</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-4">
-                {/* Mensaje de Error */}
-                {error && (
-                  <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100 text-center font-medium">
-                    {error}
-                  </div>
-                )}
-
-                {/* Input RUT */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-slate-600 uppercase">RUT</label>
-                    <input 
-                        type="text"
-                        placeholder="Ej: 11111111-1"
-                        className="p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                        value={rut}
-                        onChange={(e) => setRut(e.target.value)}
-                        required
-                    />
-                </div>
-
-                {/* Input Contraseña */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Contraseña</label>
-                    <input 
-                        type="password"
-                        placeholder="••••••••"
-                        className="p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                    />
-                </div>
-
-                {/* Botón Submit */}
-                <button 
-                  type="submit" 
-                  disabled={isLoading}
-                  className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 rounded-xl text-sm transition-all shadow-lg hover:shadow-sky-500/20 disabled:opacity-70 flex justify-center items-center gap-2"
-                >
-                    {isLoading ? (
-                      <><i className="fa-solid fa-circle-notch fa-spin"></i> Validando...</>
-                    ) : (
-                      'Iniciar Sesión'
-                    )}
-                </button>
-            </form>
-            <div className="text-center text-xs text-slate-400 pt-2">
-                Hospital Dr. Franco Ravera Zunino • Gestión de Proyectos
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background p-4">
+      <div className="w-full max-w-sm space-y-8">
+        <div className="space-y-2">
+          <p className="font-mono text-3xl font-bold tracking-[0.25em] text-primary">SICTEQ</p>
+          <p className="text-muted-foreground">Trazabilidad de la Central de Esterilización<br />Hospital Dr. Franco Ravera Zunino</p>
         </div>
+
+        <form onSubmit={handleLogin} className="space-y-5 rounded-lg border border-border bg-card p-6">
+          {motivoSalida && !error && (
+            <p role="status" className="rounded-md border border-warn/40 bg-warn/15 p-3 text-sm font-bold text-warn">{motivoSalida}</p>
+          )}
+          {error && (
+            <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="rut">RUT</Label>
+            <Input id="rut" type="text" autoComplete="username" placeholder="11111111-1" value={rut} onChange={(e) => setRut(e.target.value)} required autoFocus />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Contraseña</Label>
+            <Input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+
+          <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
+            {isLoading ? <><i className="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Validando…</> : 'Ingresar'}
+          </Button>
+        </form>
+
+        <p className="text-xs text-muted-foreground">Cada persona entra con su propia cuenta. La sesión se cierra sola tras 30 minutos sin uso.</p>
+      </div>
     </div>
   );
 }

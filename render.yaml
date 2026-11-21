@@ -1,0 +1,30 @@
+# Blueprint de Render para el backend de SICTEQ.
+# Uso: en render.com -> New -> Blueprint -> conectar este repo.
+# El plan "free" se duerme tras 15 min sin trafico (arranque en frío 12-30 s);
+# el workflow .github/workflows/mantener-despierto.yml lo evita en horario de uso.
+# Si se recrea el servicio, elegir región Virginia (us-east): la base de Neon
+# está en us-east-1 y así cada consulta no cruza el continente (prueba de carga, PB-08).
+#
+# Variables de entorno a completar a mano en el dashboard de Render
+# (no se versionan aca por seguridad):
+#   DATABASE_URL -> connection string de Neon de PRODUCCIÓN
+#   JWT_SECRET   -> texto aleatorio de 32+ caracteres; SIN ESTA VARIABLE EL SERVIDOR NO ARRANCA
+#   CORS_ORIGINS -> opcional; por defecto el frontend en workers.dev y localhost:5173
+#   ALLOWED_IPS  -> opcional; IPs permitidas separadas por coma (PB-11)
+services:
+  - type: web
+    name: sicteq-backend
+    runtime: node
+    plan: free
+    rootDir: sicteq-backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PORT
+        value: 4000

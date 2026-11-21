@@ -1,0 +1,60 @@
+# PB-12: respaldo diario de la base de producción (RPO 24 h) y prueba de
+# restauración mensual. El respaldo sale cifrado (AES-256-GCM): el repo es
+# público y la base tiene RUT de pacientes.
+#
+# Secrets necesarios (GitHub -> Settings -> Secrets and variables -> Actions):
+#   DATABASE_URL          base a respaldar (producción)
+#   BACKUP_PASSPHRASE     clave de cifrado, guardarla también fuera de GitHub
+#   RESTORE_DATABASE_URL  base DESECHABLE para la prueba mensual (rama de Neon de pruebas)
+#
+# Ojo: GitHub solo ejecuta los "schedule" desde la rama por defecto (main).
+name: Respaldo diario
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # todos los días, 04:00 hora de Chile
+    - cron: '0 8 1 * *'   # día 1 de cada mes: además prueba la restauración
+  workflow_dispatch:
+    inputs:
+      probar_restauracion:
+        description: 'Restaurar el respaldo en RESTORE_DATABASE_URL y verificarlo'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sicteq-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sicteq-backend/package-lock.json
+      - run: npm ci --omit=dev
+
+      - name: Respaldar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: node respaldo/respaldo.js respaldos
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-${{ github.run_number }}
+          path: sicteq-backend/respaldos/*.enc
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Prueba de restauración
+        if: github.event.schedule == '0 8 1 * *' || inputs.probar_restauracion
+        env:
+          RESTORE_DATABASE_URL: ${{ secrets.RESTORE_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: node respaldo/restaurar.js "$(ls respaldos/*.enc | head -1)" --confirmo-borrar-destino
