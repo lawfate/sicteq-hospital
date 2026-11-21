@@ -11,9 +11,31 @@ import { nombreEstado, varianteEstado } from '@/etapas';
 // Las solicitudes guardan "[Instrumental Requerido: Set X] - nota": se muestra solo el set.
 const cajaPedida = (texto) => String(texto || '').match(/\[Instrumental Requerido:\s*([^\]]+)\]/)?.[1] || texto || '—';
 
+// Lo que cada rol hace a diario, a un clic desde el Panel.
+const ACCIONES = {
+  TENS: [
+    { ruta: '/ciclo', texto: 'Recibir o mover una caja', icono: 'fa-barcode' },
+    { ruta: '/autoclave', texto: 'Armar carga de autoclave', icono: 'fa-temperature-high' },
+    { ancla: 'pedidos', texto: 'Entregar pedidos de pabellón', icono: 'fa-truck-medical' },
+    { ruta: '/etiquetas', texto: 'Imprimir etiquetas', icono: 'fa-tags' },
+  ],
+  Enfermera: [
+    { ruta: '/solicitudes', texto: 'Pedir caja para cirugía', icono: 'fa-clipboard-list' },
+    { ruta: '/autoclave', texto: 'Liberar cargas de autoclave', icono: 'fa-check-double' },
+    { ruta: '/vinculo', texto: 'Vincular caja con paciente', icono: 'fa-hand-holding-medical' },
+    { ruta: '/indicadores', texto: 'Ver indicadores', icono: 'fa-gauge-high' },
+  ],
+  IT: [
+    { ruta: '/auditoria', texto: 'Revisar auditoría', icono: 'fa-user-shield' },
+    { ruta: '/reportes', texto: 'Exportar reportes', icono: 'fa-file-lines' },
+    { ruta: '/indicadores', texto: 'Ver indicadores', icono: 'fa-gauge-high' },
+    { ruta: '/inventario', texto: 'Revisar inventario', icono: 'fa-boxes-stacked' },
+  ],
+};
+
 const fecha = (d) => new Date(d).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-export default function Dashboard() {
+export default function Dashboard({ user }) {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', items: [] });
@@ -79,6 +101,20 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
+      {ACCIONES[user?.role] && (
+        <section aria-label="Acciones rápidas" className="flex flex-wrap gap-3">
+          {ACCIONES[user.role].map((a) => (
+            <Button
+              key={a.texto}
+              variant="secondary"
+              onClick={() => (a.ruta ? navigate(a.ruta) : document.getElementById(a.ancla)?.scrollIntoView({ behavior: 'smooth' }))}
+            >
+              <i className={`fa-solid ${a.icono}`} aria-hidden="true"></i>{a.texto}
+            </Button>
+          ))}
+        </section>
+      )}
+
       {/* Resumen: cuatro números, sin adornos, legibles a distancia */}
       <section aria-label="Resumen" className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card lg:grid-cols-4">
         {resumen.map((r, i) => (
@@ -145,7 +181,7 @@ export default function Dashboard() {
       </section>
 
       {/* Pedidos de pabellón por atender */}
-      <Card>
+      <Card id="pedidos" className="scroll-mt-4">
         <CardHeader>
           <CardTitle>Pedidos de pabellón por atender</CardTitle>
           <CardDescription>Los 5 más recientes. Entregar abre la pantalla de entrega con el pedido cargado.</CardDescription>

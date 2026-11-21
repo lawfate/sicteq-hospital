@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
 import { toCSV } from '../csv';
+import { nombreEstado } from '@/etapas';
 
 const TABS = [
   { id: 'trazabilidad', label: 'Trazabilidad', icon: 'fa-route' },
@@ -125,7 +126,10 @@ function ReporteTrazabilidad() {
       if (hasta) params.set('hasta', hasta);
       const res = await apiFetch(`/api/reportes/trazabilidad?${params.toString()}`);
       const data = await res.json();
-      setRows(Array.isArray(data) ? data : []);
+      setRows(Array.isArray(data) ? data.map(row => ({
+        ...row,
+        estado_nuevo: nombreEstado(row.estado_nuevo)
+      })) : []);
     } catch (err) {
       console.error('Error al cargar reporte de trazabilidad:', err);
     } finally {

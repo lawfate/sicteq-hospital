@@ -118,7 +118,7 @@ function App() {
           <Header onMenuClick={() => setMenuAbierto(true)} />
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<Dashboard user={user} />} />
                 
                 {/* AÑADIDO EL user AQUÍ PARA QUE LA ENFERMERA QUEDE REGISTRADA */}
                 <Route path="/solicitudes" element={<Solicitudes user={user} />} />
