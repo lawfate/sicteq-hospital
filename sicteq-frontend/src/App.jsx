@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { apiFetch } from './api'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { pantallaDe, puedeVer } from './navegacion'
 import Login from './components/Login'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -95,6 +96,9 @@ function App() {
     };
   }, [user, handleLogout]);
 
+  // Una pantalla que el rol no usa no existe para él: se vuelve al Panel.
+  const soloSiPuede = (ruta, pantalla) => (puedeVer(pantallaDe(ruta), user?.role) ? pantalla : <Navigate to="/" replace />);
+
   if (checkingSession) {
     return null;
   }
@@ -120,16 +124,15 @@ function App() {
               <Routes>
                 <Route path="/" element={<Dashboard user={user} />} />
                 
-                {/* AÑADIDO EL user AQUÍ PARA QUE LA ENFERMERA QUEDE REGISTRADA */}
-                <Route path="/solicitudes" element={<Solicitudes user={user} />} />
+                <Route path="/solicitudes" element={soloSiPuede('/solicitudes', <Solicitudes user={user} />)} />
                 
                 <Route path="/ciclo" element={<Ciclo />} />
-                {/* Importante: Pasamos el user a Vinculo para que el control de acceso funcione */}
+                {/* Sin guardia de menú: TENS llega aquí solo desde un pedido (?solicitud=) para despacharlo */}
                 <Route path="/vinculo" element={<Vinculo user={user} />} />
                 <Route path="/inventario" element={<Inventario />} />
-                <Route path="/reportes" element={<Reportes />} />
+                <Route path="/reportes" element={<Reportes user={user} />} />
                 <Route path="/autoclave" element={<Autoclave user={user} />} />
-                <Route path="/auditoria" element={<Auditoria user={user} />} />
+                <Route path="/auditoria" element={soloSiPuede('/auditoria', <Auditoria />)} />
                 <Route path="/indicadores" element={<Indicadores />} />
                 <Route path="/etiquetas" element={<Etiquetas />} />
               </Routes>

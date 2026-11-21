@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { SECCIONES } from '@/navegacion';
+import { SECCIONES, puedeVer } from '@/navegacion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -30,7 +30,7 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
 
         <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Menú principal">
           {SECCIONES.map((seccion) => {
-            const items = seccion.items.filter((i) => !i.soloRol || i.soloRol === user.role);
+            const items = seccion.items.filter((i) => puedeVer(i, user.role));
             if (!items.length) return null;
             return (
               <div key={seccion.titulo} className="space-y-1">

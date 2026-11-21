@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 
 export default function Vinculo({ user }) {
@@ -20,7 +20,7 @@ export default function Vinculo({ user }) {
   const [status, setStatus] = useState({ loading: false, message: '', type: '' });
   const [vinculoStatus, setVinculoStatus] = useState({ loading: false, message: '', type: '' });
 
-  // LOGICA DE ROLES MEJORADA:
+  // TENS despacha (llega con ?solicitud desde el Panel); Enfermería vincula con paciente.
   const isAuthorized =
     user?.role === 'IT' ||
     (user?.role === 'Enfermera' && !isDespachoMode) ||
@@ -116,6 +116,10 @@ export default function Vinculo({ user }) {
     }
   };
 
+  // Fuera de su tarea no se muestra nada: TENS sin pedido vuelve al Panel (ahí elige qué entregar)
+  // y Enfermería que abre un despacho pasa a su vista de vínculo con paciente.
+  if (!isAuthorized) return <Navigate to={isDespachoMode ? '/vinculo' : '/'} replace />;
+
   return (
     <div className="space-y-6">
 
@@ -123,15 +127,6 @@ export default function Vinculo({ user }) {
       {status.message && (
         <div className={`p-4 rounded-lg text-sm font-medium text-center max-w-lg mx-auto ${status.type === 'success' ? 'bg-ok/15 text-ok border border-ok/40' : 'bg-danger/15 text-danger border border-danger/40'}`}>
           {status.message}
-        </div>
-      )}
-
-      {/* Módulo Restringido */}
-      {!isAuthorized && (
-        <div className="bg-danger/15 border border-danger/40 text-danger p-6 rounded-lg text-center space-y-3 max-w-xl mx-auto">
-          <i className="fa-solid fa-lock text-3xl"></i>
-          <h3 className="font-bold text-lg">Módulo Restringido</h3>
-          <p className="text-sm">Tu perfil ({user?.role}) no cuenta con los privilegios necesarios para acceder a esta vista específica.</p>
         </div>
       )}
 
