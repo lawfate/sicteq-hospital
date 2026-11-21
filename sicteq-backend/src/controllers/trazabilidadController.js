@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { registrarAuditoria } = require('../utils/auditoria');
+const { entero } = require('../utils/validacion');
 
 const buscarCaja = async (req, res) => {
     const codigo = String(req.params.codigo || '').trim().toUpperCase();
@@ -52,7 +53,11 @@ const etapaDe = (estado) => {
 
 const actualizarEtapa = async (req, res) => {
     const codigo = String(req.body.codigo || '').trim().toUpperCase();
-    const { stage, vigenciaDias } = req.body;
+    const { stage, vigenciaDias, piezasContadas } = req.body;
+    const conteo = piezasContadas === undefined ? null : entero(piezasContadas, 0, 500);
+    if (piezasContadas !== undefined && conteo === null) {
+        return res.status(400).json({ error: 'piezasContadas debe ser un entero entre 0 y 500.' });
+    }
     let { reason, metodo, temperatura, presion, tiempoMinutos } = req.body;
 
     // Validación de campos requeridos. El motivo (reason) es opcional al avanzar
@@ -66,13 +71,17 @@ const actualizarEtapa = async (req, res) => {
         return res.status(400).json({ error: "Etapa inválida: debe ser un número del 1 al 6." });
     }
 
+    let client;
     try {
-        const cajaResult = await db.query(
-            "SELECT id, inventario_id FROM caja_fisica WHERE codigo_caja = $1 LIMIT 1",
+        client = await db.connect();
+        await client.query('BEGIN');
+        const cajaResult = await client.query(
+            "SELECT id, inventario_id FROM caja_fisica WHERE codigo_caja = $1 LIMIT 1 FOR UPDATE",
             [codigo]
         );
 
         if (cajaResult.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ error: `No se encontró ninguna caja con el código "${codigo}"` });
         }
 
@@ -81,8 +90,8 @@ const actualizarEtapa = async (req, res) => {
         // Mantenemos el area_destino_id del ultimo movimiento registrado para esta
         // caja (si existe), ya que actualizarEtapa solo cambia la etapa del proceso,
         // no el area fisica de destino.
-        const lastMove = await db.query(
-            "SELECT area_destino_id, estado_nuevo FROM HISTORIAL_MOVIMIENTO WHERE caja_fisica_id = $1 ORDER BY fecha_cambio DESC LIMIT 1",
+        const lastMove = await client.query(
+            "SELECT area_destino_id, estado_nuevo FROM HISTORIAL_MOVIMIENTO WHERE caja_fisica_id = $1 ORDER BY fecha_cambio DESC, id DESC LIMIT 1",
             [caja_fisica_id]
         );
         const area_destino_id = lastMove.rows[0]?.area_destino_id ?? null;
@@ -93,7 +102,7 @@ const actualizarEtapa = async (req, res) => {
         if (!esRetroceso && (etapaNueva === ALMACENAMIENTO_STAGE_ID || etapaNueva === ENTREGA_STAGE_ID)) {
             // PB-04: una caja solo avanza si su carga más reciente fue liberada
             // como "Estéril". Una carga En proceso o No estéril la bloquea.
-            const carga = await db.query(`
+            const carga = await client.query(`
                 SELECT c.id, c.numero_maquina, c.numero_ciclo, c.estado,
                        c.metodo, c.temperatura, c.presion, c.tiempo_minutos
                 FROM vinculo_trazabilidad v
@@ -104,6 +113,7 @@ const actualizarEtapa = async (req, res) => {
             // shortcut: cajas sin ninguna carga registrada (flujo previo al sprint 2) pasan sin bloqueo; exigir carga cuando la Central use el módulo de autoclave a diario.
             const ultima = carga.rows[0];
             if (ultima && ultima.estado !== 'Estéril') {
+                await client.query('ROLLBACK');
                 await registrarAuditoria(req, 'etapa_bloqueada', 'caja_fisica', codigo, { etapa: etapaNueva, carga: `M${ultima.numero_maquina}-C${ultima.numero_ciclo}`, estado_carga: ultima.estado });
                 return res.status(409).json({ error: `La caja ${codigo} pertenece a la carga M${ultima.numero_maquina}-C${ultima.numero_ciclo} con estado "${ultima.estado}". No puede pasar a Almacenamiento ni Entrega hasta que una carga suya sea liberada como Estéril.` });
             }
@@ -118,6 +128,7 @@ const actualizarEtapa = async (req, res) => {
                     tiempoMinutos = ultima.tiempo_minutos;
                     reason = `Ingreso a bodega estéril — carga M${ultima.numero_maquina}-C${ultima.numero_ciclo}`;
                 } else {
+                    await client.query('ROLLBACK');
                     return res.status(400).json({ error: 'Para pasar a Almacenamiento o Entrega se requieren los parámetros de esterilización o un comentario que justifique su ausencia.' });
                 }
             }
@@ -125,14 +136,33 @@ const actualizarEtapa = async (req, res) => {
 
         // Formatear el estado y la justificación
         const estadoFormateado = `Etapa ${etapaNueva}`;
-        const justificacionFinal = (reason || '').trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
+        let justificacionFinal = (reason || '').trim() !== "" ? reason : `Avance a ${estadoFormateado}`;
+        let incidencia = null;
+        if (etapaNueva === 1 && conteo !== null) {
+            const tipo = await client.query('SELECT piezas FROM inventario WHERE id = $1', [inventario_id]);
+            const esperadas = tipo.rows[0]?.piezas;
+            if (esperadas !== null && esperadas !== undefined) {
+                if (conteo < esperadas) {
+                    const faltantes = esperadas - conteo;
+                    const detalle = `Faltan ${faltantes} pieza(s) al recibir`;
+                    const result = await client.query(`INSERT INTO incidencia
+                        (caja_fisica_id, piezas_esperadas, piezas_contadas, detalle, usuario_id)
+                        VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+                    [caja_fisica_id, esperadas, conteo, detalle, req.user.id]);
+                    incidencia = { id: result.rows[0].id, piezas_esperadas: esperadas, piezas_contadas: conteo, detalle };
+                    justificacionFinal += ` — faltan ${faltantes} pieza(s) (${conteo}/${esperadas})`;
+                } else if (conteo === esperadas) {
+                    justificacionFinal += ` — completa (${conteo}/${esperadas} piezas)`;
+                }
+            }
+        }
 
         // Parámetros recibidos o heredados de la carga al ingresar a bodega.
         const query = `
             INSERT INTO HISTORIAL_MOVIMIENTO
             (inventario_id, caja_fisica_id, estado_anterior, estado_nuevo, fecha_cambio, area_destino_id, justificacion,
-             metodo_esterilizacion, temperatura, presion, tiempo_minutos, usuario_id)
-            VALUES ($1, $2, $10, $3, NOW(), $4, $5, $6, $7, $8, $9, $11)
+             metodo_esterilizacion, temperatura, presion, tiempo_minutos, usuario_id, piezas_contadas)
+            VALUES ($1, $2, $10, $3, NOW(), $4, $5, $6, $7, $8, $9, $11, $12)
         `;
 
         const values = [
@@ -142,29 +172,40 @@ const actualizarEtapa = async (req, res) => {
             presion || null,
             tiempoMinutos !== undefined && tiempoMinutos !== '' ? tiempoMinutos : null,
             lastMove.rows[0]?.estado_nuevo ?? null,
-            req.user.id
+            req.user.id,
+            etapaNueva === 1 ? conteo : null
         ];
 
-        await db.query(query, values);
+        await client.query(query, values);
 
         // Al pasar por Almacenamiento, calculamos y guardamos la fecha de
         // caducidad del empaque (hoy + vigencia en días) para poder alertar
         // sobre rotación de stock. Vigencia por defecto: VIGENCIA_DIAS_DEFAULT.
         if (Number(stage) === ALMACENAMIENTO_STAGE_ID) {
             const dias = Number(vigenciaDias) > 0 ? Number(vigenciaDias) : VIGENCIA_DIAS_DEFAULT;
-            await db.query(
+            await client.query(
                 `UPDATE caja_fisica SET fecha_caducidad = NOW() + ($1 || ' days')::INTERVAL WHERE id = $2`,
                 [dias, caja_fisica_id]
             );
+        } else {
+            await client.query('UPDATE caja_fisica SET estante_id = NULL WHERE id = $1', [caja_fisica_id]);
         }
 
+        await client.query('COMMIT');
+        if (incidencia) {
+            await registrarAuditoria(req, 'incidencia_piezas', 'incidencia', incidencia.id,
+                { caja_fisica_id, piezas_esperadas: incidencia.piezas_esperadas, piezas_contadas: conteo, detalle: incidencia.detalle });
+        }
         await registrarAuditoria(req, 'cambio_etapa', 'caja_fisica', codigo, {
             desde: lastMove.rows[0]?.estado_nuevo ?? null, hacia: estadoFormateado, retroceso: esRetroceso, motivo: (reason || '').trim() || null
         });
-        res.json({ success: true, message: "Etapa actualizada correctamente" });
+        res.json({ success: true, message: "Etapa actualizada correctamente", incidencia: Boolean(incidencia) });
     } catch (err) {
+        if (client) await client.query('ROLLBACK').catch(() => {});
         console.error(">>> [ERROR CRÍTICO] FALLO EN SQL:", err);
         res.status(500).json({ error: "Error al guardar el cambio de etapa" });
+    } finally {
+        if (client) client.release();
     }
 };
 

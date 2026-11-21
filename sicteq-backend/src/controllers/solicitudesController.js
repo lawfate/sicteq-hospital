@@ -149,7 +149,7 @@ const despacharSolicitud = async (req, res) => {
                    (SELECT c.estado || '|M' || c.numero_maquina || '-C' || c.numero_ciclo
                       FROM vinculo_trazabilidad v JOIN ciclo_esterilizacion c ON c.id = v.ciclo_id
                      WHERE v.caja_fisica_id = cf.id ORDER BY v.fecha DESC, v.id DESC LIMIT 1) AS carga
-            FROM caja_fisica cf WHERE cf.codigo_caja = $1 LIMIT 1`, [caja_codigo]);
+            FROM caja_fisica cf WHERE cf.codigo_caja = $1 LIMIT 1 FOR UPDATE`, [caja_codigo]);
         if (caja.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: `No se encontró ninguna caja con el código "${caja_codigo}"` }); }
         const k = caja.rows[0];
 
@@ -180,6 +180,7 @@ const despacharSolicitud = async (req, res) => {
         }
 
         // Descuenta el stock disponible del tipo de caja despachado.
+        await client.query('UPDATE caja_fisica SET estante_id = NULL WHERE id = $1', [k.id]);
         await client.query('UPDATE inventario SET cantidad_disponible = GREATEST(cantidad_disponible - 1, 0) WHERE id = $1', [k.inventario_id]);
         await client.query("UPDATE solicitud SET estado = 'Despachado' WHERE id = $1", [id]);
         await client.query(

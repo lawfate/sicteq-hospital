@@ -51,9 +51,10 @@ export default function Etiquetas() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch('/api/cajas/circulacion')
-      .then(r => r.ok ? r.json() : Promise.reject(new Error(`Error ${r.status}`)))
-      .then(setCajas)
+    const leer = (ruta) => apiFetch(ruta).then(r => r.ok ? r.json() : Promise.reject(new Error(`Error ${r.status}`)));
+    // Los estantes de bodega (EST-B2) se imprimen igual que las cajas: van en la misma lista.
+    Promise.all([leer('/api/cajas/circulacion'), leer('/api/estantes')])
+      .then(([cs, es]) => setCajas([...cs, ...es.map(e => ({ id: `est-${e.codigo}`, codigo_caja: e.codigo, nombre_equipo: e.descripcion || 'Estante de bodega estéril', estado_nuevo: 'Estante' }))]))
       .catch(e => setError('No se pudieron cargar las cajas: ' + e.message));
   }, []);
 
@@ -73,13 +74,13 @@ export default function Etiquetas() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <p className="max-w-3xl text-muted-foreground">Marque las cajas y presione Imprimir. Cada etiqueta lleva el código de barras: después basta con escanearla en Seguimiento de cajas o en Cargas de autoclave.</p>
+      <p className="max-w-3xl text-muted-foreground">Marque las cajas o estantes y presione Imprimir. Cada etiqueta lleva el código de barras: después basta con escanearla en Seguimiento de cajas o en Cargas de autoclave. Los estantes (EST-…) se escanean al guardar cajas en la bodega estéril.</p>
 
       {error && <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>}
 
       <Card>
         <div className="flex flex-wrap items-center gap-3 p-4">
-          <Input value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="Filtrar por código o tipo de caja" aria-label="Filtrar cajas" className="min-w-[220px] flex-1" />
+          <Input value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="Filtrar por código, tipo de caja o EST-" aria-label="Filtrar cajas" className="min-w-[220px] flex-1" />
           <span className="font-mono text-sm text-muted-foreground">{sel.size} marcada{sel.size === 1 ? '' : 's'}</span>
           <Button disabled={sel.size === 0} onClick={() => imprimir(cajas.filter(c => sel.has(c.codigo_caja)))}>
             <i className="fa-solid fa-print" aria-hidden="true"></i> Imprimir etiquetas

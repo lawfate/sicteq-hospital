@@ -18,7 +18,8 @@ export const SECCIONES = [
     titulo: 'Bodega',
     items: [
       { ruta: '/inventario', nombre: 'Inventario', icono: 'fa-boxes-stacked', ayuda: 'Stock por tipo de caja' },
-      { ruta: '/etiquetas', nombre: 'Etiquetas', icono: 'fa-tags', ayuda: 'Imprimir códigos de barras' },
+      { ruta: '/etiquetas', nombre: 'Etiquetas', icono: 'fa-tags', ayuda: 'Imprimir códigos de barras de cajas y estantes' },
+      { ruta: '/catalogo', nombre: 'Catálogo de cajas', icono: 'fa-box-archive', ayuda: 'Tipos de caja, cajas y estantes', roles: ['Enfermera', 'IT'] },
     ],
   },
   {
@@ -26,6 +27,7 @@ export const SECCIONES = [
     items: [
       { ruta: '/indicadores', nombre: 'Indicadores', icono: 'fa-gauge-high', ayuda: 'Metas del proyecto' },
       { ruta: '/reportes', nombre: 'Reportes', icono: 'fa-file-lines', ayuda: 'Exportar a Excel (CSV)', roles: ['Enfermera', 'IT'] },
+      { ruta: '/usuarios', nombre: 'Usuarios', icono: 'fa-users-gear', ayuda: 'Crear cuentas y resetear claves', roles: ['IT'] },
       { ruta: '/auditoria', nombre: 'Auditoría', icono: 'fa-user-shield', ayuda: 'Quién hizo qué y cuándo', roles: ['IT'] },
     ],
   },

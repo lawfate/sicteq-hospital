@@ -6,6 +6,9 @@ const { JWT_SECRET } = require('../config/jwt');
 // 30 minutos sin uso y sin sesiones simultáneas del mismo usuario.
 const INACTIVIDAD_MINUTOS = 30;
 
+// Lo único permitido con una clave temporal: cambiarla o salir.
+const RUTAS_CON_CLAVE_TEMPORAL = ['/api/auth/cambiar-clave', '/api/auth/logout'];
+
 // Exige un Bearer token válido para todo lo que no sea login/health, y además
 // que sea la sesión vigente del usuario (la del último login) y que no lleve
 // más de 30 min sin uso. Cada petición válida renueva la actividad.
@@ -31,7 +34,7 @@ const requireAuth = async (req, res, next) => {
             `UPDATE usuario SET ultima_actividad = NOW()
              WHERE id = $1 AND activo = true AND sesion_id = $2
                AND ultima_actividad > NOW() - make_interval(mins => $3)
-             RETURNING id`,
+             RETURNING debe_cambiar_clave`,
             [payload.id, payload.sid || null, INACTIVIDAD_MINUTOS]
         );
 
@@ -48,6 +51,10 @@ const requireAuth = async (req, res, next) => {
         }
 
         req.user = payload;
+        // Cuenta nueva o reseteada por IT: no puede hacer nada hasta cambiar la clave.
+        if (ok.rows[0].debe_cambiar_clave && !RUTAS_CON_CLAVE_TEMPORAL.includes(req.originalUrl.split('?')[0])) {
+            return res.status(403).json({ error: 'Debe cambiar su clave temporal antes de continuar.', motivo: 'cambiar_clave' });
+        }
         next();
     } catch (err) {
         console.error('Error validando sesión:', err);
@@ -72,6 +79,9 @@ const ROLES = {
     liberarCarga: ['Enfermera', 'IT'],    // resultado del ciclo de autoclave
     reportes: ['Enfermera', 'IT'],        // acceso a reportes
     auditoria: ['IT'],
+    usuarios: ['IT'],                     // crear, desactivar y resetear cuentas
+    catalogo: ['Enfermera', 'IT'],        // tipos de caja, cajas físicas y estantes
+    incidencias: ['Enfermera', 'IT'],     // resolver piezas faltantes
 };
 
 module.exports = { requireAuth, requireRole, ROLES, INACTIVIDAD_MINUTOS };

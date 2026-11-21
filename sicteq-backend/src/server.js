@@ -18,7 +18,10 @@ const reportesRoutes = require('./routes/reportesRoutes');
 const cicloRoutes = require('./routes/cicloRoutes');
 const auditoriaRoutes = require('./routes/auditoriaRoutes');
 const indicadoresRoutes = require('./routes/indicadoresRoutes');
-const { requireAuth } = require('./middleware/authMiddleware');
+const { requireAuth, requireRole, ROLES } = require('./middleware/authMiddleware');
+const usuariosRoutes = require('./routes/usuariosRoutes');
+const estanteRoutes = require('./routes/estanteRoutes');
+const incidenciasRoutes = require('./routes/incidenciasRoutes');
 const { restringirIP } = require('./middleware/ipMiddleware');
 
 // PB-03: CORS solo para el frontend propio (antes '*'). Otros orígenes se
@@ -69,6 +72,9 @@ app.use('/api/reportes', requireAuth, reportesRoutes);
 app.use('/api/ciclos', requireAuth, cicloRoutes);
 app.use('/api/auditoria', requireAuth, auditoriaRoutes);
 app.use('/api/indicadores', requireAuth, indicadoresRoutes);
+app.use('/api/usuarios', requireAuth, requireRole(...ROLES.usuarios), usuariosRoutes);
+app.use('/api/estantes', requireAuth, estanteRoutes);
+app.use('/api/incidencias', requireAuth, incidenciasRoutes);
 
 // Ruta de Salud para probar que el servidor responde
 app.get('/api/health', (req, res) => {

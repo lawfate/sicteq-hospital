@@ -22,7 +22,7 @@ const login = async (req, res) => {
         // hash bcrypt, no texto plano, así que hay que traer la fila y
         // comparar con bcrypt.compare.
         const result = await db.query(`
-            SELECT u.id, u.rut, u.nombre, u.password_hash, u.rol_id, r.nombre as rol,
+            SELECT u.id, u.rut, u.nombre, u.password_hash, u.rol_id, r.nombre as rol, u.debe_cambiar_clave,
                    CEIL(EXTRACT(EPOCH FROM (u.bloqueado_hasta - NOW())) / 60)::int AS minutos_bloqueo
             FROM usuario u
             JOIN rol r ON u.rol_id = r.id
@@ -57,7 +57,7 @@ const login = async (req, res) => {
             return res.status(401).json({ error: `RUT o contraseña incorrectos (intento ${intentos} de ${MAX_INTENTOS}).` });
         }
 
-        const user = { id: row.id, rut: row.rut, nombre: row.nombre, rol: row.rol };
+        const user = { id: row.id, rut: row.rut, nombre: row.nombre, rol: row.rol, debe_cambiar_clave: row.debe_cambiar_clave };
         // PB-02: cada login abre una sesión nueva (sid) y deja inválida la
         // anterior del mismo usuario -- sin sesiones simultáneas.
         const sid = crypto.randomUUID();
@@ -87,4 +87,32 @@ const logout = async (req, res) => {
     }
 };
 
-module.exports = { login, logout };
+// Cambio de clave (obligatorio tras crear o resetear la cuenta). Mínimo 8
+// caracteres, distinta de la actual; exige la clave actual (la temporal).
+const CLAVE_MINIMA = 8;
+const cambiarClave = async (req, res) => {
+    const actual = String(req.body.actual || '');
+    const nueva = String(req.body.nueva || '');
+    if (nueva.length < CLAVE_MINIMA || nueva.length > 72) {
+        return res.status(400).json({ error: `La clave nueva debe tener entre ${CLAVE_MINIMA} y 72 caracteres.` });
+    }
+    if (nueva === actual) {
+        return res.status(400).json({ error: 'La clave nueva debe ser distinta de la actual.' });
+    }
+    try {
+        const u = await db.query('SELECT password_hash FROM usuario WHERE id = $1 AND activo = true', [req.user.id]);
+        if (!u.rows[0] || !(await bcrypt.compare(actual, u.rows[0].password_hash))) {
+            await registrarAuditoria(req, 'cambio_clave_fallido', 'usuario', req.user.id);
+            return res.status(400).json({ error: 'La clave actual no es correcta.' });
+        }
+        const hash = await bcrypt.hash(nueva, 10);
+        await db.query('UPDATE usuario SET password_hash = $1, debe_cambiar_clave = false WHERE id = $2', [hash, req.user.id]);
+        await registrarAuditoria(req, 'cambio_clave', 'usuario', req.user.id);
+        res.json({ message: 'Clave actualizada.' });
+    } catch (err) {
+        console.error('Error al cambiar la clave:', err);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
+module.exports = { login, logout, cambiarClave };

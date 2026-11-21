@@ -39,7 +39,8 @@ export default function Login({ onLogin }) {
       const user = {
         id: data.user.id,
         name: data.user.nombre,
-        role: data.user.rol
+        role: data.user.rol,
+        debeCambiarClave: Boolean(data.user.debe_cambiar_clave)
       };
       localStorage.setItem('sicteq_user', JSON.stringify(user));
 

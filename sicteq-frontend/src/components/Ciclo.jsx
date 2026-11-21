@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Modal from './Modal';
 import Estacion from './Estacion';
-import { apiFetch, moverCaja } from '../api';
+import { apiFetch, moverCaja, fichaCaja } from '../api';
 import { bip } from '../sonido';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +49,8 @@ export default function Ciclo() {
   const navigate = useNavigate();
   const [modo, setModo] = useState('caja'); // 'caja' | 'estacion'
   const [avance, setAvance] = useState({ enviando: false, mensaje: '', ok: false });
+  const [ficha, setFicha] = useState(null); // tipo, piezas y estante de la caja en pantalla
+  const [contadas, setContadas] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [activeBox, setActiveBox] = useState(null);
@@ -103,6 +105,7 @@ export default function Ciclo() {
       setSearchText(codigo);
 
       setLogs(data);
+      fichaCaja(codigo).then((f) => { setFicha(f); setContadas(f?.piezas ? String(f.piezas) : ''); });
 
       // Dirección caja -> paciente de la trazabilidad bidireccional: qué
       // paciente(s) se le vincularon a esta caja física, si los hay.
@@ -204,9 +207,10 @@ export default function Ciclo() {
     if (avance.enviando || !siguiente?.etapa) return;
     setAvance({ enviando: true, mensaje: '', ok: false });
     try {
-      const r = await moverCaja(activeBox.codigo, siguiente.etapa, siguiente.motivo);
+      const cuenta = siguiente.etapa === 1 && ficha?.piezas ? { piezasContadas: Number(contadas) } : {};
+      const r = await moverCaja(activeBox.codigo, siguiente.etapa, siguiente.motivo, cuenta);
       bip(r.ok);
-      setAvance({ codigo: activeBox.codigo, enviando: false, ok: r.ok, mensaje: r.ok ? `${activeBox.codigo} quedó en ${ETAPAS.find(e => e.id === siguiente.etapa).nombre}.` : r.mensaje || 'No se pudo mover la caja.' });
+      setAvance({ codigo: activeBox.codigo, enviando: false, ok: r.ok, mensaje: !r.ok ? r.mensaje || 'No se pudo mover la caja.' : r.incidencia ? `${activeBox.codigo} recibida con ${ficha.piezas - Number(contadas)} pieza(s) faltante(s): quedó una incidencia en el Panel.` : `${activeBox.codigo} quedó en ${ETAPAS.find(e => e.id === siguiente.etapa).nombre}.` });
       if (r.ok) handleSearch(activeBox.codigo);
     } catch {
       bip(false);
@@ -259,8 +263,14 @@ export default function Ciclo() {
             {/* Línea de tiempo */}
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle className="font-mono text-2xl">{activeBox.codigo}</CardTitle>
-                <Badge variant="info" className="px-3 py-1 text-sm">{ETAPAS.find(e => e.id === activeBox.stage)?.nombre}</Badge>
+                <div className="min-w-0 space-y-1">
+                  <CardTitle className="font-mono text-2xl">{activeBox.codigo}</CardTitle>
+                  {ficha && <CardDescription>{ficha.tipo}{ficha.piezas ? ` · ${ficha.piezas} piezas` : ''}</CardDescription>}
+                </div>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  {ficha?.estante && <Badge variant="ok" className="px-3 py-1 font-mono text-sm">{ficha.estante}</Badge>}
+                  <Badge variant="info" className="px-3 py-1 text-sm">{ETAPAS.find(e => e.id === activeBox.stage)?.nombre}</Badge>
+                </div>
               </CardHeader>
               <CardContent>
                 <ol className="grid grid-cols-3 gap-2 2xl:grid-cols-6">
@@ -316,8 +326,16 @@ export default function Ciclo() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {siguiente?.nota && <p className="text-sm text-muted-foreground">{siguiente.nota}</p>}
+                {siguiente?.etapa === 1 && ficha?.piezas && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="piezas-recibidas">Piezas contadas (trae {ficha.piezas})</Label>
+                    <Input id="piezas-recibidas" inputMode="numeric" className="w-32 font-mono text-xl" value={contadas}
+                      onChange={(e) => setContadas(e.target.value.replace(/\D/g, '').slice(0, 3))} />
+                    {Number(contadas) < ficha.piezas && <p className="text-sm font-bold text-warn">Faltan {ficha.piezas - Number(contadas)}: quedará una incidencia.</p>}
+                  </div>
+                )}
                 {siguiente && !siguiente.nota && (
-                  <Button size="lg" className="w-full" disabled={avance.enviando}
+                  <Button size="lg" className="w-full" disabled={avance.enviando || (siguiente.etapa === 1 && ficha?.piezas && (contadas === '' || Number(contadas) > ficha.piezas))}
                     onClick={() => (siguiente.ruta ? navigate(siguiente.ruta) : avanzar())}>
                     {avance.enviando ? 'Guardando…' : siguiente.texto}
                   </Button>
