@@ -71,7 +71,7 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
     check('PB-02', 'TENS no puede vincular caja a paciente', 403, r.status, r.json);
 
     // ---------------- PB-04 / PB-05: carga de autoclave ----------------
-    const cajas = (await db.query(`SELECT id, codigo_caja FROM caja_fisica WHERE estado = 'En circulación' ORDER BY id LIMIT 3`)).rows;
+    const cajas = (await db.query(`SELECT id, codigo_caja, inventario_id FROM caja_fisica WHERE estado = 'En circulación' ORDER BY id LIMIT 3`)).rows;
     if (cajas.length < 3) throw new Error('Se necesitan al menos 3 cajas físicas en circulación en la base de pruebas.');
     const [c1, c2, c3] = cajas;
     const numCiclo = Number(String(Date.now()).slice(-6));
@@ -107,7 +107,7 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
     r = await api('PUT', `/api/ciclos/${ciclo2}/resultado`, enf, { resultado: 'Estéril' });
     check('PB-04', `Nueva carga M2-C${numCiclo + 1} liberada como Estéril`, 200, r.status, '');
     r = await api('POST', '/api/trazabilidad/actualizar', tens, { codigo: c1.codigo_caja, stage: 5 });
-    check('Req. 1', 'Almacenamiento sin parámetros ni comentario se rechaza en el servidor', 400, r.status, r.json);
+    check('Req. 1', 'Almacenamiento sin parámetros ni comentario usa la carga Estéril', 200, r.status, r.json);
     r = await api('POST', '/api/trazabilidad/actualizar', tens, { codigo: c1.codigo_caja, stage: 5, ...params, tiempoMinutos: 18 });
     check('PB-04', 'Con carga Estéril la caja pasa a Almacenamiento', 200, r.status, r.json);
     const cad = (await db.query(`SELECT ROUND(EXTRACT(EPOCH FROM (fecha_caducidad - NOW())) / 86400) AS dias FROM caja_fisica WHERE id = $1`, [c1.id])).rows[0];
@@ -115,7 +115,7 @@ const resumen = (j) => JSON.stringify(j).slice(0, 220);
 
     // ---------------- Despacho seguro ----------------
     const area = (await db.query(`SELECT id FROM area WHERE nombre LIKE 'Pabellón%' ORDER BY id LIMIT 1`)).rows[0].id;
-    const nuevaSol = async () => (await api('POST', '/api/solicitudes', enf, { area_id: area, tipo_cirugia: 'Programada', instrumental: 'Prueba de despacho seguro' })).json.id;
+    const nuevaSol = async () => (await api('POST', '/api/solicitudes', enf, { area_id: area, tipo_cirugia: 'Programada', inventario_id: c1.inventario_id })).json.id;
     let sol = await nuevaSol();
     r = await api('PUT', `/api/solicitudes/${sol}/despachar`, tens, { caja_codigo: c2.codigo_caja });
     check('Despacho', 'No se despacha una caja que no está en Almacenamiento', 409, r.status, r.json);

@@ -114,7 +114,7 @@ const msg = (j) => (typeof j === 'string' ? j : (j.error || j.message || JSON.st
 
     // CP-11 despacho con stock suficiente
     const area = (await db.query(`SELECT id FROM area WHERE nombre LIKE 'Pabellón%' ORDER BY id LIMIT 1`)).rows[0].id;
-    const sol = (await api('POST', '/api/solicitudes', enf, { area_id: area, tipo_cirugia: 'Programada', instrumental: 'CP-11 prueba de despacho' })).json.id;
+    const sol = (await api('POST', '/api/solicitudes', enf, { area_id: area, tipo_cirugia: 'Programada', inventario_id: caja.inventario_id })).json.id;
     await db.query('UPDATE inventario SET cantidad_disponible = GREATEST(cantidad_disponible, 5) WHERE id = $1', [caja.inventario_id]);
     const antes = (await db.query('SELECT cantidad_disponible FROM inventario WHERE id = $1', [caja.inventario_id])).rows[0].cantidad_disponible;
     r = await api('PUT', `/api/solicitudes/${sol}/despachar`, tens, { caja_codigo: caja.codigo_caja });

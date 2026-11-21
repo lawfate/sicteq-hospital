@@ -14,14 +14,25 @@ const getSolicitudes = async (req, res) => {
     const estado = nullable(req.query.estado);
     const desde = nullable(req.query.desde);
     const hasta = nullable(req.query.hasta);
+    const limite = req.query.limite ?? null;
     if (filtroInvalido([desde, hasta], [areaId])) {
         return res.status(400).json({ error: 'Filtro inválido: revise las fechas y el área.' });
+    }
+    if (limite !== null && (typeof limite !== 'string' || !/^\d+$/.test(limite) || Number(limite) < 1 || Number(limite) > 500)) {
+        return res.status(400).json({ error: 'Límite inválido: debe ser un entero entre 1 y 500.' });
     }
 
     try {
         const result = await db.query(`
             SELECT s.id, s.fecha_creacion, s.estado, s.tipo_cirugia, s.observaciones,
-                   a.nombre AS area_nombre, u.nombre AS usuario_nombre
+                   a.nombre AS area_nombre, u.nombre AS usuario_nombre,
+                   (SELECT cf.codigo_caja FROM historial_movimiento h
+                    JOIN caja_fisica cf ON cf.id = h.caja_fisica_id
+                    WHERE h.solicitud_id = s.id AND h.estado_nuevo = 'Despachado'
+                    ORDER BY h.fecha_cambio DESC, h.id DESC LIMIT 1) AS caja_despachada,
+                   (SELECT i.nombre_equipo FROM detalle_solicitud d
+                    JOIN inventario i ON i.id = d.inventario_id
+                    WHERE d.solicitud_id = s.id LIMIT 1) AS caja_pedida
             FROM solicitud s
             LEFT JOIN area a ON s.area_id = a.id
             LEFT JOIN usuario u ON s.usuario_id = u.id
@@ -29,8 +40,11 @@ const getSolicitudes = async (req, res) => {
               AND ($2::text IS NULL OR s.estado = $2)
               AND ($3::timestamp IS NULL OR s.fecha_creacion >= $3)
               AND ($4::timestamp IS NULL OR s.fecha_creacion <= $4)
+              AND ($5::int IS NULL OR s.usuario_id = $5)
+              AND (NOT $6::boolean OR s.estado IN ('Pendiente', 'En Preparación', 'Listo'))
             ORDER BY s.fecha_creacion DESC
-        `, [areaId, estado, desde, hasta]);
+            LIMIT $7::int
+        `, [areaId, estado, desde, hasta, req.query.mios === '1' ? req.user.id : null, req.query.pendientes === '1', limite]);
 
         res.json(result.rows);
     } catch (error) {
@@ -52,23 +66,53 @@ const getAreas = async (req, res) => {
 
 // POST: Guardar la nueva solicitud
 const crearSolicitud = async (req, res) => {
-    const { area_id, tipo_cirugia, instrumental, observaciones } = req.body;
+    const { tipo_cirugia, observaciones } = req.body;
     const usuario_id = req.user.id; // del token, no del body
+    // Los <select> mandan el id como texto: se acepta "12" o 12, nada más.
+    const entero = (v) => (/^\d{1,9}$/.test(String(v ?? '')) ? Number(v) : NaN);
+    const inventario_id = entero(req.body.inventario_id);
+    const area_id = entero(req.body.area_id);
 
+    if (!Number.isInteger(inventario_id) || inventario_id <= 0) {
+        return res.status(400).json({ error: 'inventario_id debe ser un entero positivo válido.' });
+    }
+    if (!Number.isInteger(area_id) || area_id <= 0) {
+        return res.status(400).json({ error: 'area_id debe ser un entero positivo válido.' });
+    }
+    if (!['Programada', 'Urgencia Médica'].includes(tipo_cirugia)) {
+        return res.status(400).json({ error: 'tipo_cirugia debe ser Programada o Urgencia Médica.' });
+    }
+
+    const client = await db.connect();
     try {
-        const obsFinal = `[Instrumental Requerido: ${instrumental}] ${observaciones ? '- ' + observaciones : ''}`;
+        await client.query('BEGIN');
+        const inventario = await client.query('SELECT id, nombre_equipo FROM inventario WHERE id = $1', [inventario_id]);
+        if (inventario.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'El inventario_id indicado no existe en el catálogo.' });
+        }
+        const obsFinal = `[Instrumental Requerido: ${inventario.rows[0].nombre_equipo}]${observaciones ? ' - ' + observaciones : ''}`;
 
-        const result = await db.query(
+        const result = await client.query(
             `INSERT INTO solicitud (usuario_id, area_id, estado, tipo_cirugia, observaciones)
              VALUES ($1, $2, 'Pendiente', $3, $4) RETURNING id`,
             [usuario_id, area_id, tipo_cirugia, obsFinal]
         );
 
-        await registrarAuditoria(req, 'crear_solicitud', 'solicitud', result.rows[0].id, { area_id, tipo_cirugia });
+        await client.query(
+            `INSERT INTO detalle_solicitud (solicitud_id, inventario_id, cantidad_solicitada)
+             VALUES ($1, $2, 1)`,
+            [result.rows[0].id, inventario_id]
+        );
+        await client.query('COMMIT');
+        await registrarAuditoria(req, 'crear_solicitud', 'solicitud', result.rows[0].id, { area_id, tipo_cirugia, inventario_id });
         res.json({ message: 'Solicitud creada con éxito', id: result.rows[0].id });
     } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error("Error al crear solicitud:", error);
         res.status(500).json({ error: 'Error interno del servidor al crear solicitud' });
+    } finally {
+        client.release();
     }
 };
 
@@ -108,6 +152,14 @@ const despacharSolicitud = async (req, res) => {
             FROM caja_fisica cf WHERE cf.codigo_caja = $1 LIMIT 1`, [caja_codigo]);
         if (caja.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: `No se encontró ninguna caja con el código "${caja_codigo}"` }); }
         const k = caja.rows[0];
+
+        // Debe ser del tipo pedido (pedidos antiguos sin detalle no se validan).
+        const pedido = await client.query(`SELECT d.inventario_id, i.nombre_equipo FROM detalle_solicitud d
+            JOIN inventario i ON i.id = d.inventario_id WHERE d.solicitud_id = $1 LIMIT 1`, [id]);
+        if (pedido.rows[0] && pedido.rows[0].inventario_id !== k.inventario_id) {
+            await client.query('ROLLBACK');
+            return rechazar(409, `La caja ${caja_codigo} no es del tipo pedido (${pedido.rows[0].nombre_equipo}).`);
+        }
 
         // Reglas de seguridad del paciente: solo sale de la Central una caja
         // almacenada, de una carga liberada como Estéril y con empaque vigente.

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Modal from './Modal';
-import { apiFetch } from '../api';
+import Estacion from './Estacion';
+import { apiFetch, moverCaja } from '../api';
+import { bip } from '../sonido';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,9 +32,23 @@ const parseStage = (estadoNuevo) => {
 // justifique -- igual que un retroceso.
 const requiereProbarEsterilizacion = (stage) => stage === 5 || stage === 6;
 
+// Siguiente paso normal desde cada etapa (6 = en pabellón). Esterilización entra
+// por una carga de autoclave y la salida a pabellón por un pedido: ahí se enlaza.
+const SIGUIENTE = {
+  1: { etapa: 2, texto: 'Pasar a Lavado' },
+  2: { etapa: 3, texto: 'Pasar a Preparación' },
+  3: { ruta: '/autoclave', texto: 'Armar carga de autoclave' },
+  4: { etapa: 5, texto: 'Pasar a Bodega estéril' },
+  5: { nota: 'Lista en bodega estéril. Sale a pabellón cuando se entrega con un pedido.' },
+  6: { etapa: 1, texto: 'Recibir desde pabellón', motivo: 'Recepción desde pabellón' },
+};
+
 const METODOS_ESTERILIZACION = ["Autoclave", "Óxido de Etileno", "Plasma de Peróxido de Hidrógeno"];
 
 export default function Ciclo() {
+  const navigate = useNavigate();
+  const [modo, setModo] = useState('caja'); // 'caja' | 'estacion'
+  const [avance, setAvance] = useState({ enviando: false, mensaje: '', ok: false });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [activeBox, setActiveBox] = useState(null);
@@ -180,9 +196,36 @@ export default function Ciclo() {
   };
 
   const etapaDestino = ETAPAS.find(e => e.id === targetStage);
+  const siguiente = activeBox && SIGUIENTE[activeBox.stage];
+
+  // Un clic: la caja pasa a su etapa siguiente sin formulario (para Bodega estéril
+  // el servidor toma los datos de la carga liberada como Estéril).
+  const avanzar = async () => {
+    if (avance.enviando || !siguiente?.etapa) return;
+    setAvance({ enviando: true, mensaje: '', ok: false });
+    try {
+      const r = await moverCaja(activeBox.codigo, siguiente.etapa, siguiente.motivo);
+      bip(r.ok);
+      setAvance({ codigo: activeBox.codigo, enviando: false, ok: r.ok, mensaje: r.ok ? `${activeBox.codigo} quedó en ${ETAPAS.find(e => e.id === siguiente.etapa).nombre}.` : r.mensaje || 'No se pudo mover la caja.' });
+      if (r.ok) handleSearch(activeBox.codigo);
+    } catch {
+      bip(false);
+      setAvance({ codigo: activeBox.codigo, enviando: false, ok: false, mensaje: 'Sin conexión con el servidor.' });
+    }
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <div className="inline-flex rounded-md border border-border bg-card p-1" role="radiogroup" aria-label="Forma de trabajo">
+        {[['caja', 'Una caja'], ['estacion', 'Modo estación']].map(([id, texto]) => (
+          <button key={id} type="button" role="radio" aria-checked={modo === id} onClick={() => setModo(id)}
+            className={`rounded px-4 py-2 text-sm font-bold transition-colors ${modo === id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            {texto}
+          </button>
+        ))}
+      </div>
+
+      {modo === 'estacion' ? <Estacion /> : (<>
       {/* Escáner: lo primero y lo más grande de la pantalla */}
       <Card>
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-end">
@@ -269,10 +312,21 @@ export default function Ciclo() {
             {/* Mover de etapa */}
             <Card>
               <CardHeader>
-                <CardTitle>Mover la caja</CardTitle>
-                <CardDescription>Elija la etapa a la que pasa la caja.</CardDescription>
+                <CardTitle>Siguiente paso</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {siguiente?.nota && <p className="text-sm text-muted-foreground">{siguiente.nota}</p>}
+                {siguiente && !siguiente.nota && (
+                  <Button size="lg" className="w-full" disabled={avance.enviando}
+                    onClick={() => (siguiente.ruta ? navigate(siguiente.ruta) : avanzar())}>
+                    {avance.enviando ? 'Guardando…' : siguiente.texto}
+                  </Button>
+                )}
+                {avance.mensaje && avance.codigo === activeBox.codigo && (
+                  <p role={avance.ok ? 'status' : 'alert'} className={`rounded-md border p-3 text-sm font-bold ${avance.ok ? 'border-ok/40 bg-ok/15 text-ok' : 'border-danger/40 bg-danger/15 text-danger'}`}>{avance.mensaje}</p>
+                )}
+                <details className="group space-y-3 border-t border-border pt-3">
+                  <summary className="cursor-pointer text-sm font-bold text-muted-foreground">Otra etapa o corrección</summary>
                 <div className="space-y-1.5">
                   <Label htmlFor="etapa-destino">Pasa a</Label>
                   <Select id="etapa-destino" value={targetStage} onChange={(e) => setTargetStage(parseInt(e.target.value))}>
@@ -280,7 +334,8 @@ export default function Ciclo() {
                   </Select>
                 </div>
                 {esRetroceso && <p className="rounded-md border border-warn/40 bg-warn/15 p-3 text-sm font-bold text-warn">Es un retroceso: tendrá que escribir el motivo.</p>}
-                <Button size="lg" className="w-full" onClick={() => setIsModalOpen(true)}>Continuar</Button>
+                <Button variant="secondary" className="w-full" onClick={() => setIsModalOpen(true)}>Continuar</Button>
+                </details>
               </CardContent>
             </Card>
 
@@ -306,6 +361,8 @@ export default function Ciclo() {
           </div>
         </div>
       )}
+
+      </>)}
 
       <Modal
         isOpen={isModalOpen}

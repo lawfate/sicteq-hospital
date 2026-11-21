@@ -9,6 +9,7 @@ import Dashboard from './components/Dashboard'
 import Solicitudes from './components/Solicitudes'
 import Ciclo from './components/Ciclo'
 import Vinculo from './components/Vinculo'
+import Entrega from './components/Entrega'
 import Inventario from './components/Inventario'
 import Reportes from './components/Reportes'
 import Autoclave from './components/Autoclave'
@@ -127,8 +128,8 @@ function App() {
                 <Route path="/solicitudes" element={soloSiPuede('/solicitudes', <Solicitudes user={user} />)} />
                 
                 <Route path="/ciclo" element={<Ciclo />} />
-                {/* Sin guardia de menú: TENS llega aquí solo desde un pedido (?solicitud=) para despacharlo */}
-                <Route path="/vinculo" element={<Vinculo user={user} />} />
+                <Route path="/entrega" element={soloSiPuede('/entrega', <Entrega />)} />
+                <Route path="/vinculo" element={soloSiPuede('/vinculo', <Vinculo user={user} />)} />
                 <Route path="/inventario" element={<Inventario />} />
                 <Route path="/reportes" element={soloSiPuede('/reportes', <Reportes user={user} />)} />
                 <Route path="/autoclave" element={<Autoclave user={user} />} />

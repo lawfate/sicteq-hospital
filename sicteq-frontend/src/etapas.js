@@ -14,6 +14,9 @@ const numeroDe = (estado) => {
   return m ? Number(m[1]) : null;
 };
 
+// 'Etapa 3' -> 3; 'Despachado' -> 6 (en pabellón); sin movimientos -> null.
+export const etapaDe = (estado) => (/despachad/i.test(estado || '') ? 6 : numeroDe(estado));
+
 export function nombreEstado(estado) {
   if (!estado) return 'Sin movimientos';
   if (/despachad/i.test(estado)) return 'En pabellón';
