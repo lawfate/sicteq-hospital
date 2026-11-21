@@ -100,7 +100,7 @@ export default function Etiquetas() {
             {visibles.map(c => (
               <TableRow key={c.id} className={cn('cursor-pointer', sel.has(c.codigo_caja) && 'bg-primary/10 hover:bg-primary/10')} onClick={() => toggle(c.codigo_caja)}>
                 <TableCell><input type="checkbox" className="h-4 w-4 accent-primary" checked={sel.has(c.codigo_caja)} onChange={() => toggle(c.codigo_caja)} onClick={e => e.stopPropagation()} aria-label={`Marcar ${c.codigo_caja}`} /></TableCell>
-                <TableCell className="font-mono font-bold">{c.codigo_caja}</TableCell>
+                <TableCell className="whitespace-nowrap font-mono font-bold">{c.codigo_caja}</TableCell>
                 <TableCell>{c.nombre_equipo}</TableCell>
                 <TableCell><Badge variant={varianteEstado(c.estado_nuevo)}>{nombreEstado(c.estado_nuevo)}</Badge></TableCell>
                 <TableCell><div className="w-40 overflow-hidden rounded-sm" dangerouslySetInnerHTML={{ __html: svgSeguro(c.codigo_caja, { alto: 28, modulo: 1 }) }} /></TableCell>

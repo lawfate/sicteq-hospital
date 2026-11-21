@@ -263,9 +263,9 @@ export default function Ciclo() {
           <div className="space-y-6 lg:col-span-2">
             {/* Línea de tiempo */}
             <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0">
-                <div className="min-w-0 space-y-1">
-                  <CardTitle className="font-mono text-2xl">{activeBox.codigo}</CardTitle>
+              <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+                <div className="min-w-[12rem] flex-1 space-y-1">
+                  <CardTitle className="whitespace-nowrap font-mono text-2xl">{activeBox.codigo}</CardTitle>
                   {ficha && <CardDescription>{ficha.tipo}{ficha.piezas ? ` · ${ficha.piezas} piezas` : ''}</CardDescription>}
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-2">
