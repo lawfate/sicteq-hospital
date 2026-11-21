@@ -74,4 +74,47 @@ const getReporteVinculos = async (req, res) => {
     }
 };
 
-module.exports = { getReporteTrazabilidad, getReporteVinculos };
+// Calcula el siguiente movimiento antes de filtrar el rango de fechas.
+const getReporteTiempos = async (req, res) => {
+    const desde = nullable(req.query.desde);
+    const hasta = nullable(req.query.hasta);
+    const inventario_id = nullable(req.query.inventario_id);
+    if (filtroInvalido([desde, hasta], [inventario_id]) ||
+        (inventario_id !== null && (!Number.isSafeInteger(Number(inventario_id)) || Number(inventario_id) > 2147483647))) {
+        return res.status(400).json({ error: 'Filtro inválido: revise las fechas y el inventario_id.' });
+    }
+
+    try {
+        const result = await db.query(`
+            WITH movimientos AS (
+                SELECT caja_fisica_id, inventario_id, estado_nuevo, fecha_cambio,
+                       LEAD(fecha_cambio) OVER (PARTITION BY caja_fisica_id ORDER BY fecha_cambio, id) AS siguiente
+                FROM historial_movimiento
+            ), intervalos AS (
+                SELECT estado_nuevo, EXTRACT(EPOCH FROM (siguiente - fecha_cambio)) / 60 AS minutos
+                FROM movimientos
+                WHERE siguiente IS NOT NULL
+                  AND siguiente - fecha_cambio BETWEEN INTERVAL '0 seconds' AND INTERVAL '60 days'
+                  AND ($1::timestamp IS NULL OR fecha_cambio >= $1)
+                  AND ($2::timestamp IS NULL OR fecha_cambio <= $2)
+                  AND ($3::int IS NULL OR inventario_id = $3)
+            )
+            SELECT estado_nuevo AS estado, COUNT(*)::int AS veces,
+                   ROUND((percentile_cont(0.5) WITHIN GROUP (ORDER BY minutos))::numeric)::int AS mediana_min,
+                   ROUND((percentile_cont(0.9) WITHIN GROUP (ORDER BY minutos))::numeric)::int AS p90_min,
+                   ROUND(AVG(minutos))::int AS promedio_min
+            FROM intervalos
+            GROUP BY estado_nuevo
+            ORDER BY CASE estado_nuevo
+                WHEN 'Etapa 1' THEN 1 WHEN 'Etapa 2' THEN 2 WHEN 'Etapa 3' THEN 3
+                WHEN 'Etapa 4' THEN 4 WHEN 'Etapa 5' THEN 5 WHEN 'Despachado' THEN 6
+                WHEN 'Etapa 6' THEN 7 ELSE 8 END
+        `, [desde, hasta, inventario_id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error al generar reporte de tiempos:', err);
+        res.status(500).json({ error: 'Error al generar reporte de tiempos' });
+    }
+};
+
+module.exports = { getReporteTrazabilidad, getReporteVinculos, getReporteTiempos };
