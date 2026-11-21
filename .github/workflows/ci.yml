@@ -1,0 +1,43 @@
+name: Pruebas automáticas
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sicteq-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: sicteq-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint -- --max-warnings=0
+      - run: npm run build
+        env:
+          VITE_API_URL: https://sicteq-backend.onrender.com
+      - run: node src/xlsx.test.mjs
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sicteq-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: sicteq-backend/package-lock.json
+      - run: npm ci
+      - name: Revisar sintaxis de todo src
+        run: find src -type f -name '*.js' -print0 | xargs -0 -n 1 node --check
+      - run: node pruebas/rut_clave.test.js

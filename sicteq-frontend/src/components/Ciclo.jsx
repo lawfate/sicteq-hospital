@@ -115,7 +115,6 @@ export default function Ciclo() {
         .then(p => setPacientesVinculados(Array.isArray(p) ? p : []))
         .catch(() => setPacientesVinculados([]));
     } catch (err) {
-      console.error(">>> ERROR DETALLADO:", err);
       alert("Problema al buscar: " + err.message);
     }
   }, []);
