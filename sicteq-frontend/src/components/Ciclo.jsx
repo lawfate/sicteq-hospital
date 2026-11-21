@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import Modal from './Modal';
 import { apiFetch } from '../api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -35,6 +36,8 @@ export default function Ciclo() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [activeBox, setActiveBox] = useState(null);
+  const [searchParams] = useSearchParams();
+  const { key: navegacion } = useLocation(); // cambia en cada escaneo de la cabecera, aunque el código se repita
   const [logs, setLogs] = useState([]);
   const [pacientesVinculados, setPacientesVinculados] = useState([]);
   const [targetStage, setTargetStage] = useState(1);
@@ -46,10 +49,10 @@ export default function Ciclo() {
   const [vigenciaDias, setVigenciaDias] = useState("365");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-
-  const handleSearch = async () => {
+  // Recibe el código explícito: del campo, de la URL (?codigo= desde la cabecera) o de la caja activa.
+  const handleSearch = useCallback(async (codigoParam) => {
     try {
-      const codigo = searchText.trim().toUpperCase();
+      const codigo = String(codigoParam || '').trim().toUpperCase();
       if (!codigo) return;
 
       const response = await apiFetch(`/api/trazabilidad/buscar/${encodeURIComponent(codigo)}`);
@@ -81,6 +84,7 @@ export default function Ciclo() {
           stage: stageActual
       });
       setTargetStage(stageActual);
+      setSearchText(codigo);
 
       setLogs(data);
 
@@ -94,7 +98,15 @@ export default function Ciclo() {
       console.error(">>> ERROR DETALLADO:", err);
       alert("Problema al buscar: " + err.message);
     }
-  };
+  }, []);
+
+  const codigoUrl = searchParams.get('codigo');
+
+  useEffect(() => {
+    if (!codigoUrl) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- handleSearch cambia estado recién tras el await, no en el cuerpo del efecto
+    handleSearch(codigoUrl);
+  }, [codigoUrl, navegacion, handleSearch]);
 
   const paramsCompletados = temperatura.trim() !== '' || presion.trim() !== '' || tiempoMinutos.trim() !== '';
   const esRetroceso = activeBox && targetStage < activeBox.stage;
@@ -158,7 +170,7 @@ export default function Ciclo() {
       setIsModalOpen(false);
       alert("Etapa actualizada con éxito");
 
-      handleSearch();
+      handleSearch(activeBox.codigo);
 
     } catch (err) {
       alert("No se pudo procesar la acción: " + err.message);
@@ -181,7 +193,7 @@ export default function Ciclo() {
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchText)}
               // PB-06: listo para la pistola apenas se abre la pantalla; al volver
               // a enfocarlo se selecciona el texto, así el siguiente escaneo lo reemplaza.
               autoFocus
@@ -190,7 +202,7 @@ export default function Ciclo() {
               className="h-14 font-mono text-xl uppercase tracking-widest"
             />
           </div>
-          <Button size="lg" onClick={handleSearch}>Buscar caja</Button>
+          <Button size="lg" onClick={() => handleSearch(searchText)}>Buscar caja</Button>
         </CardContent>
       </Card>
 

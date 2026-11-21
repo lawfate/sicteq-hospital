@@ -1,24 +1,34 @@
-// Datos de prueba (mock) para la RAMA DE PRUEBAS de Neon. Simula ~3 semanas de
+// Datos de prueba (mock) para Neon (rama de pruebas o producción). Simula ~3 semanas de
 // operación de la Central de Esterilización: cajas completas que recorren
 // Recepción -> Lavado -> Preparación -> Esterilización (cargas de autoclave)
 // -> Almacenamiento -> Despacho a pabellón -> vínculo con paciente -> vuelta.
 // Basado en la reunión del 31-08: 4 autoclaves, ciclo ~2 h, vigencia 1 año,
 // cargas No estéril vuelven a Lavado, solicitudes desde pabellones.
 //
-// BORRA y recrea todos los datos (menos roles y áreas). Solo corre contra el
-// host de la rama de pruebas.
+// BORRA y recrea todos los datos (menos roles y áreas).
 //
-// Uso: node pruebas/seed_mock.js --confirmo-base-de-pruebas
+// Uso: node pruebas/seed_mock.js --confirmo-base-de-pruebas   (rama de pruebas, .env.pruebas)
+//      node pruebas/seed_mock.js --confirmo-produccion         (producción, .env)
+// Producción: decisión del equipo (21-11) dejar este mock como base de la demo y
+// de la marcha blanca. Respaldar antes con respaldo/respaldo.js.
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-const HOST_PRUEBAS = 'ep-odd-art-atyhgd2y';
-const envPruebas = require('dotenv').parse(fs.readFileSync(path.join(__dirname, '..', '.env.pruebas')));
-const URL_DB = envPruebas.DATABASE_URL;
-if (!new URL(URL_DB).host.startsWith(HOST_PRUEBAS) || !process.argv.includes('--confirmo-base-de-pruebas')) {
-    console.error(`Solo corre contra la rama de pruebas (${HOST_PRUEBAS}) y con --confirmo-base-de-pruebas.`);
+const DESTINOS = {
+    '--confirmo-base-de-pruebas': { env: '.env.pruebas', host: 'ep-odd-art-atyhgd2y' },
+    '--confirmo-produccion': { env: '.env', host: 'ep-lively-credit-atqj4ig3' },
+};
+const flags = Object.keys(DESTINOS).filter(f => process.argv.includes(f));
+if (flags.length !== 1) {
+    console.error(`Indique exactamente uno: ${Object.keys(DESTINOS).join(' o ')}.`);
+    process.exit(1);
+}
+const destino = DESTINOS[flags[0]];
+const URL_DB = require('dotenv').parse(fs.readFileSync(path.join(__dirname, '..', destino.env))).DATABASE_URL;
+if (!new URL(URL_DB).host.startsWith(destino.host)) {
+    console.error(`${destino.env} no apunta a ${destino.host}: no se toca nada.`);
     process.exit(1);
 }
 const db = new Pool({ connectionString: URL_DB, ssl: { rejectUnauthorized: false } });
