@@ -18,6 +18,18 @@ export default function Header({ onMenuClick }) {
     return () => clearInterval(t);
   }, []);
 
+  // Versión nueva desplegada: al cambiar de pantalla se compara el script del
+  // index.html publicado con el cargado; si cambió, se recarga (nadie queda con
+  // una versión vieja abierta todo el turno). En desarrollo no hay /assets/index-*.
+  useEffect(() => {
+    const actual = document.querySelector('script[src*="/assets/index-"]')?.getAttribute('src');
+    if (!actual) return;
+    fetch('/', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((html) => { if (html.includes('/assets/index-') && !html.includes(actual)) window.location.reload(); })
+      .catch(() => {});
+  }, [pathname]);
+
   const buscarCaja = (event) => {
     event.preventDefault();
     const codigo = codigoCaja.trim().toUpperCase();
