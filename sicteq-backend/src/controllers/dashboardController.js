@@ -19,7 +19,7 @@ const getDashboardData = async (req, res) => {
                 -- Mismo criterio que /api/alertas: stock bajo el crítico o en
                 -- un estado que requiere atención, no solo 'Alerta'.
                 (SELECT COUNT(*) FROM INVENTARIO WHERE cantidad_disponible <= stock_critico OR estado_actual IN ('Alerta', 'Merma', 'En Reparación')) as alertas_stock,
-                (SELECT COUNT(*) FROM SOLICITUD WHERE estado = 'Pendiente') as solicitudes_pendientes,
+                (SELECT COUNT(*) FROM SOLICITUD WHERE estado IN ('Pendiente', 'En Preparación', 'Listo')) as solicitudes_pendientes,
                 -- Estado actual (no histórico): cajas en bodega (Etapa 5) o
                 -- despachadas a pabellón que aún no vuelven. Antes sumaba todas
                 -- las solicitudes despachadas de la historia.

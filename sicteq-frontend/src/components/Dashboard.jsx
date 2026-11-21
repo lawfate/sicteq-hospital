@@ -94,7 +94,7 @@ export default function Dashboard({ user }) {
   const resumen = [
     { titulo: 'En proceso', valor: data.stats.en_proceso, nota: 'Recepción a esterilización' },
     { titulo: 'Listas o en pabellón', valor: data.stats.total_equipos, nota: 'En bodega estéril o entregadas' },
-    { titulo: 'Pedidos pendientes', valor: data.stats.solicitudes_pendientes, nota: 'Por preparar para pabellón', alerta: data.stats.solicitudes_pendientes > 0 },
+    { titulo: 'Pedidos pendientes', valor: data.stats.solicitudes_pendientes, nota: 'Aún no entregados a pabellón', alerta: data.stats.solicitudes_pendientes > 0 },
     { titulo: 'Stock en alerta', valor: data.stats.alertas_stock, nota: 'Tipos de caja bajo el mínimo', alerta: data.stats.alertas_stock > 0 },
   ];
   const hayAlertas = alertas && (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0);
