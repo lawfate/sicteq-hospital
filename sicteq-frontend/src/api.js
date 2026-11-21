@@ -25,12 +25,17 @@ export const apiFetch = (path, options = {}) => {
 };
 
 // Mueve una caja a una etapa. Devuelve { ok, mensaje } con el motivo real del servidor.
-export async function moverCaja(codigo, etapa, motivo = '') {
+// extra: p. ej. { piezasContadas } al recibir. incidencia = faltaron piezas.
+export async function moverCaja(codigo, etapa, motivo = '', extra = {}) {
   const r = await apiFetch('/api/trazabilidad/actualizar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ codigo, stage: etapa, reason: motivo }),
+    body: JSON.stringify({ codigo, stage: etapa, reason: motivo, ...extra }),
   });
   const d = await r.json().catch(() => ({}));
-  return { ok: r.ok, mensaje: d.error || d.message || '' };
+  return { ok: r.ok, mensaje: d.error || d.message || '', incidencia: Boolean(d.incidencia) };
 }
+
+// Ficha de la caja: tipo, piezas que trae y estante donde está (o null).
+export const fichaCaja = (codigo) =>
+  apiFetch(`/api/cajas/${encodeURIComponent(codigo)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);

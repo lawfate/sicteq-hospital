@@ -5,6 +5,7 @@ import { apiFetch } from '../api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { nombreEstado, varianteEstado } from '@/etapas';
 
@@ -50,6 +51,7 @@ export default function Dashboard({ user }) {
   // null = todavía cargando (antes mostraba "Sin alertas" mientras llegaba la respuesta).
   const [alertas, setAlertas] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [resolviendo, setResolviendo] = useState(null); // { id, texto, error }
 
   useEffect(() => {
     apiFetch(`/api/dashboard`)
@@ -68,7 +70,8 @@ export default function Dashboard({ user }) {
       .then(json => setAlertas({
         stockBajo: Array.isArray(json.stockBajo) ? json.stockBajo : [],
         cajasPorVencer: Array.isArray(json.cajasPorVencer) ? json.cajasPorVencer : [],
-        cargasDemoradas: Array.isArray(json.cargasDemoradas) ? json.cargasDemoradas : []
+        cargasDemoradas: Array.isArray(json.cargasDemoradas) ? json.cargasDemoradas : [],
+        incidencias: Array.isArray(json.incidencias) ? json.incidencias : []
       }))
       .catch(err => console.error("Error cargando alertas:", err));
   }, []);
@@ -99,7 +102,20 @@ export default function Dashboard({ user }) {
     { titulo: 'Pedidos pendientes', valor: data.stats.solicitudes_pendientes, nota: 'Aún no entregados a pabellón', alerta: data.stats.solicitudes_pendientes > 0 },
     { titulo: 'Stock en alerta', valor: data.stats.alertas_stock, nota: 'Tipos de caja bajo el mínimo', alerta: data.stats.alertas_stock > 0 },
   ];
-  const hayAlertas = alertas && (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0 || alertas.cargasDemoradas.length > 0);
+  const hayAlertas = alertas && (alertas.stockBajo.length > 0 || alertas.cajasPorVencer.length > 0 || alertas.cargasDemoradas.length > 0 || alertas.incidencias.length > 0);
+  const puedeResolver = ['Enfermera', 'IT'].includes(user?.role);
+
+  const resolver = async (id) => {
+    const r = await apiFetch(`/api/incidencias/${id}/resolver`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolucion: resolviendo.texto }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setResolviendo({ ...resolviendo, error: d.error || 'No se pudo registrar.' });
+    setResolviendo(null);
+    setAlertas((a) => ({ ...a, incidencias: a.incidencias.filter((i) => i.id !== id) }));
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
@@ -134,9 +150,47 @@ export default function Dashboard({ user }) {
         {alertas === null ? (
           <p className="text-sm text-muted-foreground"><i className="fa-solid fa-circle-notch fa-spin mr-2" aria-hidden="true"></i>Revisando stock y vencimientos…</p>
         ) : !hayAlertas ? (
-          <p className="rounded-lg border border-ok/40 bg-ok/10 px-5 py-4 font-bold text-ok">Todo en orden: no hay stock bajo, empaques por vencer ni cargas demoradas.</p>
+          <p className="rounded-lg border border-ok/40 bg-ok/10 px-5 py-4 font-bold text-ok">Todo en orden: no hay stock bajo, empaques por vencer, cargas demoradas ni piezas faltantes.</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
+            {alertas.incidencias.length > 0 && (
+              <Card className="md:col-span-2">
+                <CardHeader className="flex-row items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle>Cajas con piezas faltantes</CardTitle>
+                    <CardDescription>Se detectaron al contar en Recepción.{puedeResolver ? ' Al resolver, anote qué se hizo.' : ''}</CardDescription>
+                  </div>
+                  <Badge variant="danger">{alertas.incidencias.length}</Badge>
+                </CardHeader>
+                <CardContent className="max-h-80 overflow-y-auto p-0">
+                  {alertas.incidencias.map(i => (
+                    <div key={i.id} className="space-y-2 border-t border-border px-5 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p><span className="font-mono font-bold">{i.codigo_caja}</span> · {i.tipo}</p>
+                          <p className="text-sm text-muted-foreground">{fecha(i.fecha)} · contadas {i.piezas_contadas} de {i.piezas_esperadas}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="warn">Faltan {i.piezas_esperadas - i.piezas_contadas}</Badge>
+                          {puedeResolver && resolviendo?.id !== i.id && (
+                            <Button size="sm" variant="secondary" onClick={() => setResolviendo({ id: i.id, texto: '' })}>Resolver</Button>
+                          )}
+                        </div>
+                      </div>
+                      {resolviendo?.id === i.id && (
+                        <div className="flex flex-wrap gap-2">
+                          <Input autoFocus value={resolviendo.texto} onChange={(e) => setResolviendo({ ...resolviendo, texto: e.target.value })}
+                            placeholder="Ej.: se repusieron 2 pinzas desde reserva" aria-label={`Resolución de ${i.codigo_caja}`} className="min-w-[220px] flex-1" />
+                          <Button size="sm" disabled={resolviendo.texto.trim().length < 3} onClick={() => resolver(i.id)}>Confirmar</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setResolviendo(null)}>Cancelar</Button>
+                          {resolviendo.error && <p role="alert" className="w-full text-sm font-bold text-danger">{resolviendo.error}</p>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
             {alertas.cargasDemoradas.length > 0 && (
               <Card className="md:col-span-2">
                 <CardHeader className="flex-row items-center justify-between">

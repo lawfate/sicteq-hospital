@@ -73,6 +73,7 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{user.role}</p>
             </div>
           </div>
+          <NavLink to="/clave" onClick={() => setIsOpen(false)} className="block text-xs font-bold text-muted-foreground hover:text-foreground">Cambiar mi clave</NavLink>
           <Button variant="secondary" size="sm" className="w-full" onClick={onLogout}>
             <i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión
           </Button>

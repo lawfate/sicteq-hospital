@@ -10,6 +10,9 @@ import Solicitudes from './components/Solicitudes'
 import Ciclo from './components/Ciclo'
 import Vinculo from './components/Vinculo'
 import Entrega from './components/Entrega'
+import CambiarClave from './components/CambiarClave'
+import Usuarios from './components/Usuarios'
+import Catalogo from './components/Catalogo'
 import Inventario from './components/Inventario'
 import Reportes from './components/Reportes'
 import Autoclave from './components/Autoclave'
@@ -108,6 +111,15 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  if (user.debeCambiarClave) {
+    const listo = () => {
+      const u = { ...user, debeCambiarClave: false };
+      localStorage.setItem('sicteq_user', JSON.stringify(u));
+      setUser(u);
+    };
+    return <CambiarClave obligatoria onListo={listo} onSalir={handleLogout} />;
+  }
+
   return (
     <BrowserRouter>
       <div className="flex h-full overflow-hidden bg-background text-foreground">
@@ -136,6 +148,9 @@ function App() {
                 <Route path="/auditoria" element={soloSiPuede('/auditoria', <Auditoria />)} />
                 <Route path="/indicadores" element={<Indicadores />} />
                 <Route path="/etiquetas" element={<Etiquetas />} />
+                <Route path="/catalogo" element={soloSiPuede('/catalogo', <Catalogo />)} />
+                <Route path="/usuarios" element={soloSiPuede('/usuarios', <Usuarios />)} />
+                <Route path="/clave" element={<CambiarClave />} />
               </Routes>
           </main>
         </div>

@@ -108,12 +108,17 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
     const t0 = Date.now();
     try {
         await c.query('BEGIN');
-        await c.query(`TRUNCATE auditoria, vinculo_caja_paciente, vinculo_trazabilidad, ciclo_esterilizacion, historial_movimiento,
+        await c.query(`TRUNCATE incidencia, estante, auditoria, vinculo_caja_paciente, vinculo_trazabilidad, ciclo_esterilizacion, historial_movimiento,
                        detalle_solicitud, solicitud, caja_fisica, paciente, inventario, categoria, usuario RESTART IDENTITY CASCADE`);
 
         const hash = await bcrypt.hash('123456', 10);
         await insertar(c, 'usuario', ['id', 'rut', 'nombre', 'rol_id', 'password_hash', 'activo'], PERSONAL.map(p => [...p, hash, true]));
         await insertar(c, 'categoria', ['id', 'nombre'], CATEGORIAS.map((n, i) => [i + 1, n]));
+        // Estantes de bodega estéril por sector (A: general/laparoscopía, B: traumatología, C: resto).
+        const SECTORES = { A: 'Cirugía general y laparoscopía', B: 'Traumatología', C: 'Gineco-obstetricia y otras' };
+        const estantes = Object.keys(SECTORES).flatMap(l => [1, 2, 3, 4].map(n => `EST-${l}${n}`));
+        await insertar(c, 'estante', ['id', 'codigo', 'descripcion'], estantes.map((e, i) => [i + 1, e, `Sector ${e[4]}: ${SECTORES[e[4]]}`]));
+        const estanteDe = (tipo) => { const l = [1, 2, 5].includes(tipo[2]) ? 'A' : tipo[2] === 3 ? 'B' : 'C'; return estantes.indexOf(`EST-${l}${ent(1, 4)}`) + 1; };
 
         // Pacientes ficticios (RUT con dígito verificador válido).
         const pacientes = [];
@@ -130,17 +135,19 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
 
         // ---------- simulación por pasos de 30 min ----------
         const AHORA = Date.now();
-        const INICIO = Math.floor((AHORA - 21 * DIA) / DIA) * DIA + 7 * HORA;
+        const INICIO = Math.floor((AHORA - 21 * DIA) / DIA) * DIA + 10 * HORA; // 07:00 en Chile
         const PASO = HORA / 2;
-        const hist = [], cargas = [], vincT = [], sols = [], dets = [], vincP = [], audit = [];
+        const hist = [], cargas = [], vincT = [], sols = [], dets = [], vincP = [], audit = [], incid = [];
         const numCiclo = { 1: 1180, 2: 960, 3: 1415, 4: 705 };
         const ultimoEstado = {};
         const mov = (caja, estado, t, extra = {}) => {
-            hist.push({ inv: caja.inv, caja: caja.id, ant: ultimoEstado[caja.id] ?? null, nuevo: estado, t, area: extra.area ?? 3, just: extra.just ?? null, usr: extra.usr ?? uno(TENS), sol: extra.sol ?? null, params: extra.params ?? null });
+            hist.push({ inv: caja.inv, caja: caja.id, ant: ultimoEstado[caja.id] ?? null, nuevo: estado, t, area: extra.area ?? 3, just: extra.just ?? null, usr: extra.usr ?? uno(TENS), sol: extra.sol ?? null, params: extra.params ?? null, piezas: extra.piezas ?? null });
             if (extra.auditar !== false) audit.push([extra.usr ?? hist[hist.length - 1].usr, 'cambio_etapa', 'caja_fisica', caja.codigo, JSON.stringify({ desde: ultimoEstado[caja.id] ?? null, hacia: estado }), t]);
             ultimoEstado[caja.id] = estado;
         };
-        const horaDelDia = (t) => new Date(t).getUTCHours();
+        // Jornada en hora de Chile (UTC-3 en verano): antes se usaba la hora UTC y
+        // la actividad aparecía desde las 04:00.
+        const horaDelDia = (t) => (new Date(t).getUTCHours() + 21) % 24;
         const laboral = (t) => { const h = horaDelDia(t); return h >= 7 && h < 23; };
 
         // Estado inicial: repartidas en el circuito.
@@ -252,7 +259,15 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
             for (const caja of cajas.filter(k => k.enPabellon && k.regreso <= t)) {
                 caja.enPabellon = false; caja.etapa = 1; caja.prox = t + entre(0.3, 1) * HORA;
                 const faltan = rnd() < 0.06 ? ent(1, 2) : 0;
-                mov(caja, 'Etapa 1', t, { just: faltan ? `Recepción con incidencia: faltan ${faltan} pieza(s) (${caja.tipo[4] - faltan}/${caja.tipo[4]})` : `Recepción desde pabellón: caja completa ${caja.tipo[4]}/${caja.tipo[4]} piezas` });
+                const usrRec = uno(TENS);
+                mov(caja, 'Etapa 1', t, { usr: usrRec, piezas: caja.tipo[4] - faltan, just: faltan ? `Recepción desde pabellón — faltan ${faltan} pieza(s) (${caja.tipo[4] - faltan}/${caja.tipo[4]})` : `Recepción desde pabellón — completa (${caja.tipo[4]}/${caja.tipo[4]} piezas)` });
+                if (faltan) {
+                    // Las de más de 2 días ya las resolvió Enfermería; las recientes siguen abiertas en el Panel.
+                    const resuelta = t < AHORA - 2 * DIA;
+                    incid.push([caja.id, caja.tipo[4], caja.tipo[4] - faltan, `Faltan ${faltan} pieza(s) al recibir`, usrRec, ts(t),
+                        resuelta ? uno(ENFERMERAS) : null, resuelta ? ts(t + entre(2, 20) * HORA) : null, resuelta ? uno(['Se repusieron las piezas desde reserva', 'Pieza encontrada en pabellón y devuelta', 'Se solicitó reposición a abastecimiento']) : null]);
+                    audit.push([usrRec, 'incidencia_piezas', 'caja_fisica', caja.codigo, JSON.stringify({ faltan }), t]);
+                }
             }
         }
         // Las no despachadas de hace más de 1 día se descartan (en la realidad se cancelan
@@ -282,28 +297,29 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
 
         // Inventario: total = cajas físicas del tipo; disponibles = las que están en Almacenamiento.
         const disponibles = (inv) => cajas.filter(k => k.inv === inv && k.etapa === 5).length;
-        await insertar(c, 'inventario', ['id', 'categoria_id', 'codigo_barra', 'nombre_equipo', 'cantidad_total', 'cantidad_disponible', 'estado_actual', 'stock_critico'],
+        await insertar(c, 'inventario', ['id', 'categoria_id', 'codigo_barra', 'nombre_equipo', 'cantidad_total', 'cantidad_disponible', 'estado_actual', 'stock_critico', 'piezas'],
             TIPOS.map((tp, i) => {
                 const d = disponibles(i + 1);
                 const estado = tp[0] === 'ORT-003' ? 'En Reparación' : tp[0] === 'CAR-001' && d === 0 ? 'Merma' : d <= tp[5] ? 'Alerta' : 'Disponible';
-                return [i + 1, tp[2], tp[0], tp[1], tp[3], d, estado, tp[5]];
+                return [i + 1, tp[2], tp[0], tp[1], tp[3], d, estado, tp[5], tp[4]];
             }));
-        await insertar(c, 'caja_fisica', ['id', 'inventario_id', 'codigo_caja', 'estado', 'fecha_creacion', 'fecha_caducidad'],
-            cajas.map(k => [k.id, k.inv, k.codigo, 'En circulación', ts(INICIO - 120 * DIA), k.etapa === 5 && k.caducidad ? ts(k.caducidad) : null]));
+        await insertar(c, 'caja_fisica', ['id', 'inventario_id', 'codigo_caja', 'estado', 'fecha_creacion', 'fecha_caducidad', 'estante_id'],
+            cajas.map(k => [k.id, k.inv, k.codigo, 'En circulación', ts(INICIO - 120 * DIA), k.etapa === 5 && k.caducidad ? ts(k.caducidad) : null, k.etapa === 5 ? estanteDe(k.tipo) : null]));
         await insertar(c, 'solicitud', ['id', 'usuario_id', 'area_id', 'fecha_creacion', 'estado', 'tipo_cirugia', 'observaciones'],
             sols.map(s => [s.id, s.usr, s.area, ts(s.t), s.estado, s.tipo, `[Instrumental Requerido: ${TIPOS[s.tp - 1][1]}]${s.tipo === 'Urgencia Médica' ? ' - Urgencia, prioridad alta' : ''}`]));
         await insertar(c, 'detalle_solicitud', ['solicitud_id', 'inventario_id', 'cantidad_solicitada'], dets);
         hist.sort((a, b) => a.t - b.t);
         await insertar(c, 'historial_movimiento',
-            ['inventario_id', 'caja_fisica_id', 'usuario_id', 'estado_anterior', 'estado_nuevo', 'fecha_cambio', 'justificacion', 'solicitud_id', 'area_destino_id', 'metodo_esterilizacion', 'temperatura', 'presion', 'tiempo_minutos'],
-            hist.map(h => [h.inv, h.caja, h.usr, h.ant, h.nuevo, ts(h.t), h.just, h.sol, h.area, ...(h.params || [null, null, null, null])]));
+            ['inventario_id', 'caja_fisica_id', 'usuario_id', 'estado_anterior', 'estado_nuevo', 'fecha_cambio', 'justificacion', 'solicitud_id', 'area_destino_id', 'metodo_esterilizacion', 'temperatura', 'presion', 'tiempo_minutos', 'piezas_contadas'],
+            hist.map(h => [h.inv, h.caja, h.usr, h.ant, h.nuevo, ts(h.t), h.just, h.sol, h.area, ...(h.params || [null, null, null, null]), h.piezas]));
+        await insertar(c, 'incidencia', ['caja_fisica_id', 'piezas_esperadas', 'piezas_contadas', 'detalle', 'usuario_id', 'fecha', 'resuelta_por', 'fecha_resolucion', 'resolucion'], incid);
         await insertar(c, 'vinculo_trazabilidad', ['ciclo_id', 'inventario_id', 'caja_fisica_id', 'cantidad_procesada', 'resultado', 'fecha'], vincT);
         await insertar(c, 'vinculo_caja_paciente', ['caja_fisica_id', 'paciente_id', 'usuario_id', 'fecha_vinculo'], vincP);
         audit.sort((a, b) => a[5] - b[5]);
         await insertar(c, 'auditoria', ['usuario_id', 'accion', 'entidad', 'entidad_id', 'detalle', 'fecha', 'ip'],
             audit.filter(a => a[5] <= AHORA).map(a => [a[0], a[1], a[2], String(a[3]), a[4], ts(a[5]), `10.20.${ent(1, 4)}.${ent(10, 250)}`]));
 
-        for (const tabla of ['usuario', 'categoria', 'paciente', 'inventario', 'caja_fisica', 'solicitud', 'detalle_solicitud', 'historial_movimiento', 'ciclo_esterilizacion', 'vinculo_trazabilidad', 'vinculo_caja_paciente', 'auditoria']) {
+        for (const tabla of ['estante', 'incidencia', 'usuario', 'categoria', 'paciente', 'inventario', 'caja_fisica', 'solicitud', 'detalle_solicitud', 'historial_movimiento', 'ciclo_esterilizacion', 'vinculo_trazabilidad', 'vinculo_caja_paciente', 'auditoria']) {
             await c.query(`SELECT setval(pg_get_serial_sequence('${tabla}', 'id'), GREATEST((SELECT MAX(id) FROM ${tabla}), 1))`);
         }
         await c.query('COMMIT');
@@ -313,7 +329,9 @@ const TENS = PERSONAL.filter(p => p[3] === 2).map(p => p[0]);
             (SELECT COUNT(*) FROM caja_fisica) cajas, (SELECT COUNT(*) FROM ciclo_esterilizacion) cargas,
             (SELECT COUNT(*) FROM ciclo_esterilizacion WHERE estado = 'No estéril') cargas_no_esteriles,
             (SELECT COUNT(*) FROM historial_movimiento) movimientos, (SELECT COUNT(*) FROM solicitud) solicitudes,
-            (SELECT COUNT(*) FROM vinculo_caja_paciente) vinculos_paciente, (SELECT COUNT(*) FROM auditoria) eventos_auditoria`);
+            (SELECT COUNT(*) FROM vinculo_caja_paciente) vinculos_paciente, (SELECT COUNT(*) FROM auditoria) eventos_auditoria,
+            (SELECT COUNT(*) FROM estante) estantes, (SELECT COUNT(*) FROM caja_fisica WHERE estante_id IS NOT NULL) cajas_en_estante,
+            (SELECT COUNT(*) FROM incidencia WHERE fecha_resolucion IS NULL) incidencias_abiertas`);
         console.log('Mock cargado en', new URL(URL_DB).host.split('.')[0], `(${((Date.now() - t0) / 1000).toFixed(1)} s)`);
         console.table(resumen.rows[0]);
     } catch (e) {
