@@ -11,6 +11,7 @@ import Ciclo from './components/Ciclo'
 import Vinculo from './components/Vinculo'
 import Entrega from './components/Entrega'
 import CambiarClave from './components/CambiarClave'
+import Guia from './components/Guia'
 import Usuarios from './components/Usuarios'
 import Catalogo from './components/Catalogo'
 import Inventario from './components/Inventario'
@@ -25,6 +26,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [menuAbierto, setMenuAbierto] = useState(false); // menú lateral en pantallas chicas
+  const [guia, setGuia] = useState(false);
 
   // Antes la sesión vivía solo en useState: un F5, o abrir un link en
   // pestaña nueva, botaba al login sin ninguna razón real. El token y el
@@ -45,8 +47,14 @@ function App() {
   }, []);
 
   // Lógica de Login actualizada para recibir los datos reales desde la BD
+  // La guía se abre sola la primera vez que cada persona entra en este equipo.
+  const claveGuia = (u) => `sicteq_guia_vista_${u?.id}`;
+  const guiaVista = (u) => { try { return localStorage.getItem(claveGuia(u)) === '1'; } catch { return true; } };
+  const cerrarGuia = () => { try { localStorage.setItem(claveGuia(user), '1'); } catch { /* sin almacenamiento */ } setGuia(false); };
+
   const handleLogin = (userData) => {
     setUser(userData);
+    setGuia(!guiaVista(userData));
   };
 
   const handleLogout = useCallback(() => {
@@ -132,7 +140,8 @@ function App() {
               <Button size="sm" onClick={seguirConectado} className="bg-warn text-primary-foreground hover:bg-warn/90">Seguir conectado</Button>
             </div>
           )}
-          <Header onMenuClick={() => setMenuAbierto(true)} />
+          <Header onMenuClick={() => setMenuAbierto(true)} onAyuda={() => setGuia(true)} />
+          {guia && <Guia rol={user.role} onCerrar={cerrarGuia} />}
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
               <Routes>
                 <Route path="/" element={<Dashboard user={user} />} />

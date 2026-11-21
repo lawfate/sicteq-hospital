@@ -1,20 +1,24 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { aplicarTema, temaActual } from '@/tema';
 import { SECCIONES, puedeVer } from '@/navegacion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
-  const cerrarEnMovil = () => { if (window.innerWidth < 768) setIsOpen?.(false); };
+  const [tema, setTema] = useState(temaActual);
+  const cambiarTema = () => { const t = tema === 'claro' ? 'oscuro' : 'claro'; aplicarTema(t); setTema(t); };
+  const cerrarEnMovil = () => { if (window.innerWidth < 1024) setIsOpen?.(false); };
 
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-20 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setIsOpen(false)} />
+        <div className="fixed inset-0 z-20 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setIsOpen(false)} />
       )}
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 md:static md:translate-x-0',
+          'fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 lg:static lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -23,7 +27,7 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
             <p className="font-mono text-lg font-bold tracking-[0.2em] text-primary">SICTEQ</p>
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Central de Esterilización · HFRZ</p>
           </div>
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsOpen(false)} aria-label="Cerrar menú">
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsOpen(false)} aria-label="Cerrar menú">
             <i className="fa-solid fa-xmark text-lg" aria-hidden="true"></i>
           </Button>
         </div>
@@ -73,7 +77,12 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{user.role}</p>
             </div>
           </div>
-          <NavLink to="/clave" onClick={() => setIsOpen(false)} className="block text-xs font-bold text-muted-foreground hover:text-foreground">Cambiar mi clave</NavLink>
+          <div className="flex items-center justify-between gap-2">
+            <NavLink to="/clave" onClick={() => setIsOpen(false)} className="text-xs font-bold text-muted-foreground hover:text-foreground">Cambiar mi clave</NavLink>
+            <button type="button" onClick={cambiarTema} className="text-xs font-bold text-muted-foreground hover:text-foreground">
+              {tema === 'claro' ? 'Modo oscuro' : 'Modo claro'}
+            </button>
+          </div>
           <Button variant="secondary" size="sm" className="w-full" onClick={onLogout}>
             <i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión
           </Button>

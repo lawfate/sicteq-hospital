@@ -47,7 +47,7 @@ export default function Inventario() {
               return (
                 <TableRow key={item.id}>
                   <TableCell className="font-bold">{item.nombre_equipo}</TableCell>
-                  <TableCell className="font-mono text-muted-foreground">{item.codigo_barra || '—'}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-muted-foreground">{item.codigo_barra || '—'}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <span className="w-14 shrink-0 font-mono font-bold tabular-nums">{item.cantidad_disponible}<span className="text-muted-foreground"> / {item.cantidad_total}</span></span>

@@ -25,6 +25,23 @@
     --warn: 38 92% 56%;
     --danger: 2 78% 62%;
   }
+  /* Modo claro opcional (oficinas con mucha luz, impresión de pantalla). Mismos
+     nombres de color: solo cambian los valores. Acción y estados más oscuros
+     para mantener el contraste sobre blanco. */
+  :root[data-tema='claro'] {
+    color-scheme: light;
+    --background: 210 20% 96%;
+    --card: 0 0% 100%;
+    --muted: 210 20% 92%;
+    --border: 210 16% 80%;
+    --foreground: 210 32% 12%;
+    --muted-foreground: 210 12% 36%;
+    --primary: 190 85% 26%;
+    --primary-foreground: 0 0% 100%;
+    --ok: 150 66% 27%;
+    --warn: 30 92% 30%;
+    --danger: 2 72% 44%;
+  }
   html, body, #root { height: 100%; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
