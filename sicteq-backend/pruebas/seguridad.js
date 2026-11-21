@@ -49,10 +49,10 @@ const FUGA = /syntax|invalid input|relation|column|pg_|sql|stack|at \w+ \(/i;
     const abiertas = [];
     for (const r of protegidas) if ((await api('GET', r)).status !== 401) abiertas.push(r);
     control('A01', `Las ${protegidas.length} rutas protegidas exigen sesión`, abiertas.length === 0, abiertas.length ? `abiertas: ${abiertas.join(', ')}` : 'todas 401 sin token');
-    const porRol = [['GET', '/api/auditoria'], ['GET', '/api/pacientes'], ['GET', '/api/reportes/vinculos'], ['GET', '/api/cajas/CAJA-0001/pacientes'], ['PUT', '/api/ciclos/1/resultado']];
+    const porRol = [['GET', '/api/auditoria'], ['GET', '/api/pacientes'], ['GET', '/api/reportes/vinculos'], ['GET', '/api/reportes/trazabilidad'], ['GET', '/api/cajas/CAJA-0001/pacientes'], ['PUT', '/api/ciclos/1/resultado']];
     const sinFreno = [];
     for (const [m, r] of porRol) if ((await api(m, r, tens, m === 'PUT' ? { resultado: 'Estéril' } : undefined)).status !== 403) sinFreno.push(r);
-    control('A01', 'TENS no accede a auditoría, datos de pacientes ni liberación de cargas', sinFreno.length === 0, sinFreno.length ? `sin freno: ${sinFreno.join(', ')}` : `${porRol.length} rutas → 403`);
+    control('A01', 'TENS no accede a auditoría, datos de pacientes, reportes ni liberación de cargas', sinFreno.length === 0, sinFreno.length ? `sin freno: ${sinFreno.join(', ')}` : `${porRol.length} rutas → 403`);
 
     // A02 Fallas criptográficas
     const claves = (await db.query(`SELECT COUNT(*) FILTER (WHERE password_hash LIKE '$2%')::int AS bcrypt, COUNT(*)::int AS total FROM usuario`)).rows[0];

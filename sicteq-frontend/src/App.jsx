@@ -130,7 +130,7 @@ function App() {
                 {/* Sin guardia de menú: TENS llega aquí solo desde un pedido (?solicitud=) para despacharlo */}
                 <Route path="/vinculo" element={<Vinculo user={user} />} />
                 <Route path="/inventario" element={<Inventario />} />
-                <Route path="/reportes" element={<Reportes user={user} />} />
+                <Route path="/reportes" element={soloSiPuede('/reportes', <Reportes user={user} />)} />
                 <Route path="/autoclave" element={<Autoclave user={user} />} />
                 <Route path="/auditoria" element={soloSiPuede('/auditoria', <Auditoria />)} />
                 <Route path="/indicadores" element={<Indicadores />} />

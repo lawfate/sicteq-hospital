@@ -70,6 +70,7 @@ const ROLES = {
     solicitar: ['Enfermera', 'IT'],
     despachar: ['TENS', 'IT'],
     liberarCarga: ['Enfermera', 'IT'],    // resultado del ciclo de autoclave
+    reportes: ['Enfermera', 'IT'],        // acceso a reportes
     auditoria: ['IT'],
 };
 
