@@ -39,7 +39,7 @@ export default function Header({ onMenuClick, onAyuda }) {
   };
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/60 px-4 md:px-8">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 md:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick} aria-label="Abrir menú">
           <i className="fa-solid fa-bars text-lg" aria-hidden="true"></i>
@@ -49,17 +49,18 @@ export default function Header({ onMenuClick, onAyuda }) {
           {pantalla?.ayuda && <p className="hidden truncate text-xs text-muted-foreground sm:block">{pantalla.ayuda}</p>}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-      <form onSubmit={buscarCaja} className="shrink-0">
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2 max-sm:basis-full">
+      <form onSubmit={buscarCaja} className="flex min-w-0 flex-1 gap-2 sm:max-w-sm">
         <Input
           value={codigoCaja}
           onChange={(event) => setCodigoCaja(event.target.value.toUpperCase())}
-          placeholder="Escanear"
+          placeholder="Código de caja…"
           aria-label="Buscar caja por código"
-          className="w-32 font-mono uppercase sm:w-48 lg:w-56"
+          className="min-w-0 font-mono uppercase"
         />
+        <Button type="submit" variant="secondary" className="px-3" aria-label="Buscar caja"><i className="fa-solid fa-barcode" aria-hidden="true" /><span className="hidden md:inline">Buscar</span></Button>
       </form>
-      <Button variant="ghost" size="sm" onClick={onAyuda} aria-label="Ayuda: ver la guía"><span className="sm:hidden">?</span><span className="hidden sm:inline">Ayuda</span></Button>
+      <Button variant="ghost" onClick={onAyuda} aria-label="Repetir recorrido de bienvenida" className="px-3"><i className="fa-solid fa-circle-question text-primary" aria-hidden="true" /><span className="hidden xl:inline">Repetir recorrido</span><span className="xl:hidden">Guía</span></Button>
       <p className="hidden shrink-0 font-mono text-sm text-muted-foreground xl:block">{ahora}</p>
       </div>
     </header>

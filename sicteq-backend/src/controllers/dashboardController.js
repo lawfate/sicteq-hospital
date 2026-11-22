@@ -20,6 +20,7 @@ const getDashboardData = async (req, res) => {
                 -- un estado que requiere atención, no solo 'Alerta'.
                 (SELECT COUNT(*) FROM INVENTARIO WHERE cantidad_disponible <= stock_critico OR estado_actual IN ('Alerta', 'Merma', 'En Reparación')) as alertas_stock,
                 (SELECT COUNT(*) FROM SOLICITUD WHERE estado IN ('Pendiente', 'En Preparación', 'Listo')) as solicitudes_pendientes,
+                (SELECT COUNT(*) FROM SOLICITUD WHERE estado IN ('Pendiente', 'En Preparación', 'Listo') AND tipo_cirugia ILIKE '%urgen%') as solicitudes_urgentes,
                 -- Estado actual (no histórico): cajas en bodega (Etapa 5) o
                 -- despachadas a pabellón que aún no vuelven. Antes sumaba todas
                 -- las solicitudes despachadas de la historia.
@@ -40,8 +41,7 @@ const getDashboardData = async (req, res) => {
             ORDER BY h.fecha_cambio DESC LIMIT 5
         `),
 
-        // ACTUALIZADO: Adaptado para leer 'tipo_cirugia' y sacar la caja de 'observaciones'
-        // ya que aún no tenemos la tabla intermedia conectada.
+        // Una urgencia pendiente debe aparecer aunque lleguen pedidos nuevos.
         db.query(`
             SELECT 
                 s.id AS solicitud_id,
@@ -52,7 +52,8 @@ const getDashboardData = async (req, res) => {
             FROM SOLICITUD s
             JOIN AREA a ON s.area_id = a.id
             WHERE s.estado IN ('Pendiente', 'En Preparación', 'Listo')
-            ORDER BY s.id DESC LIMIT 5
+            ORDER BY CASE WHEN s.tipo_cirugia ILIKE '%urgen%' THEN 0 ELSE 1 END,
+                     s.fecha_creacion ASC NULLS LAST, s.id ASC LIMIT 5
         `)]);
 
         res.json({

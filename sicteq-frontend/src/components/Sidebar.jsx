@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { aplicarTema, temaActual } from '@/tema';
 import { SECCIONES, puedeVer } from '@/navegacion';
@@ -7,6 +7,31 @@ import { Button } from '@/components/ui/button';
 
 export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
   const [tema, setTema] = useState(temaActual);
+  const [escritorio, setEscritorio] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const actualizar = () => setEscritorio(media.matches);
+    media.addEventListener('change', actualizar);
+    return () => media.removeEventListener('change', actualizar);
+  }, []);
+  const panel = useRef(null);
+  useEffect(() => {
+    if (!isOpen || window.innerWidth >= 1024) return;
+    const anterior = document.activeElement;
+    panel.current.querySelector('button')?.focus();
+    const tecla = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+      if (e.key === 'Tab') {
+        const elementos = [...panel.current.querySelectorAll('button, a[href]')];
+        const primero = elementos[0];
+        const ultimo = elementos.at(-1);
+        if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+        else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+      }
+    };
+    window.addEventListener('keydown', tecla);
+    return () => { window.removeEventListener('keydown', tecla); if (anterior?.isConnected) anterior.focus(); };
+  }, [isOpen, setIsOpen]);
   const cambiarTema = () => { const t = tema === 'claro' ? 'oscuro' : 'claro'; aplicarTema(t); setTema(t); };
   const cerrarEnMovil = () => { if (window.innerWidth < 1024) setIsOpen?.(false); };
 
@@ -17,8 +42,10 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
       )}
 
       <aside
+        ref={panel}
+        inert={!isOpen && !escritorio ? true : undefined}
         className={cn(
-          'fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-30 flex w-72 max-w-[90vw] flex-col border-r border-border bg-card transition-transform duration-200 lg:static lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -32,7 +59,7 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
           </Button>
         </div>
 
-        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Menú principal">
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4" aria-label="Menú principal">
           {SECCIONES.map((seccion) => {
             const items = seccion.items.filter((i) => puedeVer(i, user.role));
             if (!items.length) return null;
@@ -47,7 +74,7 @@ export default function Sidebar({ onLogout, user, isOpen, setIsOpen }) {
                     onClick={cerrarEnMovil}
                     className={({ isActive }) =>
                       cn(
-                        'group flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-[15px] transition-colors',
+                        'group flex min-h-11 items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-[15px] transition-colors',
                         isActive
                           ? 'border-primary bg-primary/10 font-bold text-foreground'
                           : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
