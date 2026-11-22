@@ -1,48 +1,73 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '../api';
 
 export default function Vinculo({ user }) {
   // Vínculo caja-paciente (Enfermería, IT). La entrega a pabellón vive en Entrega.jsx.
   const [searchTerm, setSearchTerm] = useState('');
   const [pacientes, setPacientes] = useState([]);
+  const [listaAbierta, setListaAbierta] = useState(false);
+  const [mostrarTodos, setMostrarTodos] = useState(false);
+  const campoCaja = useRef(null);
+  const solicitudFicha = useRef(0);
+  const [cargandoFicha, setCargandoFicha] = useState(false);
+  const [errorPacientes, setErrorPacientes] = useState('');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [cajaCode, setCajaCode] = useState('');
   const [vinculoStatus, setVinculoStatus] = useState({ loading: false, message: '', type: '' });
 
   const loadPacientes = () => {
     apiFetch(`/api/pacientes`)
-      .then(res => res.json())
-      .then(data => setPacientes(Array.isArray(data) ? data : []))
-      .catch(err => console.error("Error al cargar pacientes:", err));
+      .then(res => { if (!res.ok) throw new Error('No se pudo cargar la lista de pacientes.'); return res.json(); })
+      .then(data => { setPacientes(Array.isArray(data) ? data : []); setErrorPacientes(''); })
+      .catch(err => setErrorPacientes(err.message));
   };
 
   useEffect(() => {
     loadPacientes();
   }, []);
 
-  // Sin texto de búsqueda mostramos todos los pacientes (para poder verlos,
-  // no solo encontrarlos escribiendo); con texto, filtramos por RUT o nombre.
-  const filteredPatients = searchTerm
-    ? pacientes.filter(p => p.rut.includes(searchTerm) || p.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+  // La búsqueda siempre considera la lista completa, aunque solo se vean ocho.
+  const busqueda = searchTerm.trim().toLocaleLowerCase('es-CL');
+  const filteredPatients = busqueda
+    ? pacientes.filter(p => p.rut.toLowerCase().includes(busqueda) || p.nombre.toLocaleLowerCase('es-CL').includes(busqueda))
     : pacientes;
+  const pacientesVisibles = mostrarTodos ? filteredPatients : filteredPatients.slice(0, 8);
+  const verResultados = () => {
+    setListaAbierta(true);
+    requestAnimationFrame(() => document.getElementById('pacientes-registrados')?.scrollIntoView({ behavior: 'auto', block: 'start' }));
+  };
 
   // Trae la ficha completa (con historial real de cajas vinculadas) al seleccionar.
-  const selectPatient = async (rut) => {
+  const selectPatient = async (rut, refrescar = false) => {
+    const solicitud = ++solicitudFicha.current;
+    setCargandoFicha(true);
+    if (!refrescar) {
+      setSelectedPatient(null);
+      setCajaCode('');
+      setVinculoStatus({ loading: false, message: '', type: '' });
+    }
     try {
       const response = await apiFetch(`/api/pacientes/${encodeURIComponent(rut)}`);
       if (!response.ok) throw new Error('No se pudo cargar la ficha del paciente');
       const data = await response.json();
+      if (solicitud !== solicitudFicha.current) return;
       setSelectedPatient(data);
+      if (!refrescar) {
+        setListaAbierta(false);
+        requestAnimationFrame(() => { campoCaja.current?.focus({ preventScroll: true }); campoCaja.current?.closest('form')?.scrollIntoView({ behavior: 'auto', block: 'center' }); });
+      }
     } catch (err) {
-      console.error("Error al cargar ficha del paciente:", err);
+      if (solicitud === solicitudFicha.current) setVinculoStatus({ loading: false, message: err.message, type: 'error' });
+    } finally {
+      if (solicitud === solicitudFicha.current) setCargandoFicha(false);
     }
   };
 
   // Guarda la asociación y actualiza el historial del paciente.
   const handleVinculoClinico = async (e) => {
     e.preventDefault();
-    if (!selectedPatient) return alert("ERROR: Debe buscar y seleccionar un paciente.");
-    if (!cajaCode) return alert("ERROR: Ingrese el código de la caja.");
+    if (vinculoStatus.loading) return;
+    if (!selectedPatient || !cajaCode.trim()) return setVinculoStatus({ loading: false, message: 'Seleccione un paciente e ingrese el código de la caja.', type: 'error' });
 
     setVinculoStatus({ loading: true, message: '', type: '' });
 
@@ -61,10 +86,9 @@ export default function Vinculo({ user }) {
 
       // Refrescamos la ficha del paciente (nuevo item en el historial) y la lista
       // general (para que se actualice el contador "Vinculada (N)").
-      selectPatient(selectedPatient.rut);
+      selectPatient(selectedPatient.rut, true);
       loadPacientes();
 
-      setTimeout(() => setVinculoStatus({ loading: false, message: '', type: '' }), 4000);
     } catch (error) {
       setVinculoStatus({ loading: false, message: error.message, type: 'error' });
     }
@@ -72,63 +96,19 @@ export default function Vinculo({ user }) {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <label htmlFor="buscar-paciente" className="block font-bold">Buscar paciente</label>
+        <input id="buscar-paciente" type="search" placeholder="Buscar por RUT o nombre..." disabled={vinculoStatus.loading}
+          className="min-h-12 w-full rounded-lg border border-border bg-background px-3 text-base"
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); verResultados(); } }}
+          value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setMostrarTodos(false); setListaAbierta(true); }} />
+        <p className="text-sm text-muted-foreground">Busque en todos los pacientes y seleccione uno en la lista de abajo para asociar su instrumental.</p>
+        <button type="button" onClick={verResultados} className="min-h-11 rounded-lg border border-border bg-muted px-4 font-bold">{busqueda ? `Ver resultados (${filteredPatients.length})` : 'Elegir paciente de la lista'}</button>
+        {errorPacientes && <p role="alert" className="text-danger">{errorPacientes}</p>}
+      </div>
 
       {/* Vínculo clínico */}
       <div className="space-y-6">
-
-          {/* Sección de pacientes: buscador + listado visible con estado de vínculo */}
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div>
-                      <h3 className="font-bold text-foreground text-lg"><i className="fa-solid fa-users text-primary mr-2"></i>Pacientes</h3>
-                      <p className="text-xs text-muted-foreground">Buscá por RUT o nombre, o revisá quién ya tiene una caja vinculada.</p>
-                  </div>
-                  <input
-                      type="text"
-                      placeholder="Buscar por RUT o nombre..."
-                      className="w-full sm:w-72 p-2.5 border border-border rounded-lg text-sm bg-muted/40 focus:ring-2 focus:ring-primary outline-none"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-              </div>
-              <table className="w-full text-left text-sm text-muted-foreground">
-                  <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b bg-muted/40">
-                      <tr>
-                          <th className="px-6 py-3">RUT</th>
-                          <th className="px-6 py-3">Nombre</th>
-                          <th className="px-6 py-3">Pabellón</th>
-                          <th className="px-6 py-3">Caja Vinculada</th>
-                          <th className="px-6 py-3 text-center">Acción</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      {filteredPatients.map(p => (
-                          <tr key={p.rut} className={`border-b border-border hover:bg-muted/40 transition-colors ${selectedPatient?.rut === p.rut ? 'bg-primary/10' : ''}`}>
-                              <td className="whitespace-nowrap px-6 py-3 font-mono text-muted-foreground">{p.rut}</td>
-                              <td className="px-6 py-3 font-bold text-foreground">{p.nombre}</td>
-                              <td className="px-6 py-3">{p.area_nombre || '—'}</td>
-                              <td className="px-6 py-3">
-                                  {Number(p.cajas_vinculadas) > 0 ? (
-                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-ok/15 text-ok">Vinculada ({p.cajas_vinculadas})</span>
-                                  ) : (
-                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-warn/15 text-warn">Sin vincular</span>
-                                  )}
-                              </td>
-                              <td className="px-6 py-3 text-center">
-                                  <button type="button" onClick={() => selectPatient(p.rut)} className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
-                                      Seleccionar
-                                  </button>
-                              </td>
-                          </tr>
-                      ))}
-                      {filteredPatients.length === 0 && (
-                          <tr>
-                              <td colSpan="5" className="px-6 py-8 text-center text-muted-foreground">No se encontró ningún paciente con ese RUT o nombre.</td>
-                          </tr>
-                      )}
-                  </tbody>
-              </table>
-          </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
@@ -136,11 +116,11 @@ export default function Vinculo({ user }) {
           <div className="rounded-lg border border-border bg-card p-6 space-y-5">
               <div className="border-b border-border pb-3">
                   <h3 className="font-bold text-foreground text-lg"><i className="fa-solid fa-link text-primary mr-2"></i>Asociación Instrumental - Paciente</h3>
-                  <p className="text-xs text-muted-foreground">Seleccioná un paciente de la lista de arriba y emparejalo con la caja quirúrgica recepcionada.</p>
+                  <p className="text-sm text-muted-foreground">Busque y seleccione al paciente. Luego escanee la caja utilizada y confirme la asociación.</p>
               </div>
 
               {vinculoStatus.message && (
-                  <div className={`p-3 rounded-lg text-xs font-medium text-center ${vinculoStatus.type === 'success' ? 'bg-ok/15 text-ok border border-ok/40' : 'bg-danger/15 text-danger border border-danger/40'}`}>
+                  <div role={vinculoStatus.type === 'success' ? 'status' : 'alert'} className={`p-3 rounded-lg text-sm font-medium text-center ${vinculoStatus.type === 'success' ? 'bg-ok/15 text-ok border border-ok/40' : 'bg-danger/15 text-danger border border-danger/40'}`}>
                       {vinculoStatus.message}
                   </div>
               )}
@@ -151,13 +131,16 @@ export default function Vinculo({ user }) {
                       {selectedPatient ? (
                           <span className="font-bold text-foreground">{selectedPatient.nombre} <span className="text-muted-foreground font-mono font-normal">({selectedPatient.rut})</span></span>
                       ) : (
-                          <span className="text-muted-foreground italic">Ninguno — seleccioná uno en la tabla de arriba</span>
+                          <span className="text-muted-foreground">{cargandoFicha ? 'Cargando ficha…' : 'Busque un paciente o despliegue la lista de abajo.'}</span>
                       )}
                   </div>
 
                   <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Código de Caja Utilizada</label>
+                      <label htmlFor="caja-vinculada" className="text-xs font-bold text-muted-foreground uppercase">Código de Caja Utilizada</label>
                       <input
+                          id="caja-vinculada"
+                          ref={campoCaja}
+                          disabled={vinculoStatus.loading || cargandoFicha}
                           type="text"
                           className="p-2.5 border border-border rounded-lg text-sm bg-muted/40 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-primary uppercase"
                           value={cajaCode}
@@ -166,7 +149,7 @@ export default function Vinculo({ user }) {
                       />
                   </div>
 
-                  <button type="submit" disabled={vinculoStatus.loading} className="w-full bg-ok hover:bg-ok/90 disabled:bg-ok text-primary-foreground font-bold py-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-2">
+                  <button type="submit" disabled={vinculoStatus.loading || cargandoFicha || !selectedPatient || !cajaCode.trim()} className="min-h-12 w-full bg-ok hover:bg-ok/90 disabled:opacity-50 text-primary-foreground font-bold py-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
                       {vinculoStatus.loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>}
                       Confirmar Asociación Clínica
                   </button>
@@ -215,11 +198,67 @@ export default function Vinculo({ user }) {
                   <div className="text-center flex flex-col items-center justify-center h-full text-muted-foreground mt-16">
                       <i className="fa-solid fa-id-card-clip text-5xl mb-4 text-foreground"></i>
                       <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Esperando Selección</h4>
-                      <p className="text-xs max-w-xs mt-2 mx-auto">Seleccioná un paciente en la tabla de arriba para ver su ficha.</p>
+                      <p className="text-sm max-w-xs mt-2 mx-auto">{cargandoFicha ? 'Cargando ficha del paciente…' : 'Busque un paciente o selecciónelo en la lista de abajo para ver su ficha.'}</p>
                   </div>
               )}
           </div>
         </div>
+          {/* Sección de pacientes: buscador + listado visible con estado de vínculo */}
+          <div id="pacientes-registrados" className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                      <h3 className="font-bold text-foreground text-lg"><i className="fa-solid fa-users text-primary mr-2" aria-hidden="true"></i>Pacientes registrados</h3>
+                      <p className="text-sm text-muted-foreground">{filteredPatients.length} pacientes{busqueda ? ' encontrados' : ' registrados'}. Al desplegar se muestran hasta 8.</p>
+                  </div>
+                  <button type="button" aria-expanded={listaAbierta} aria-controls="lista-pacientes" onClick={() => { setListaAbierta(!listaAbierta); setMostrarTodos(false); }} className="min-h-12 rounded-lg border border-border bg-muted px-4 font-bold">{listaAbierta ? 'Ocultar pacientes' : 'Mostrar pacientes'}</button>
+              </div>
+              {listaAbierta && <div id="lista-pacientes">
+              <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-muted-foreground">
+                  <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b bg-muted/40">
+                      <tr>
+                          <th className="px-6 py-3">RUT</th>
+                          <th className="px-6 py-3">Nombre</th>
+                          <th className="px-6 py-3">Pabellón</th>
+                          <th className="px-6 py-3">Caja Vinculada</th>
+                          <th className="px-6 py-3 text-center">Acción</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {pacientesVisibles.map(p => (
+                          <tr key={p.rut} className={`border-b border-border hover:bg-muted/40 transition-colors ${selectedPatient?.rut === p.rut ? 'bg-primary/10' : ''}`}>
+                              <td className="whitespace-nowrap px-6 py-3 font-mono text-muted-foreground">{p.rut}</td>
+                              <td className="px-6 py-3 font-bold text-foreground">{p.nombre}</td>
+                              <td className="px-6 py-3">{p.area_nombre || '—'}</td>
+                              <td className="px-6 py-3">
+                                  {Number(p.cajas_vinculadas) > 0 ? (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-ok/15 text-ok">Vinculada ({p.cajas_vinculadas})</span>
+                                  ) : (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-warn/15 text-warn">Sin vincular</span>
+                                  )}
+                              </td>
+                              <td className="px-6 py-3 text-center">
+                                  <button type="button" disabled={vinculoStatus.loading || cargandoFicha} onClick={() => selectPatient(p.rut)} aria-label={`Seleccionar a ${p.nombre}`} className="min-h-11 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground px-3 py-2 rounded-lg text-sm font-bold transition-colors">
+                                      Seleccionar
+                                  </button>
+                              </td>
+                          </tr>
+                      ))}
+                      {filteredPatients.length === 0 && (
+                          <tr>
+                              <td colSpan="5" className="px-6 py-8 text-center text-muted-foreground">No se encontró ningún paciente con ese RUT o nombre.</td>
+                          </tr>
+                      )}
+                  </tbody>
+              </table>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4">
+                <p role="status" className="text-sm text-muted-foreground">Mostrando {pacientesVisibles.length} de {filteredPatients.length} pacientes.</p>
+                {filteredPatients.length > 8 && <button type="button" onClick={() => setMostrarTodos(!mostrarTodos)} className="min-h-12 rounded-lg border border-border px-4 font-bold hover:bg-muted">{mostrarTodos ? 'Mostrar solo 8 pacientes' : `Ver todos (${filteredPatients.length})`}</button>}
+              </div>
+              </div>}
+          </div>
+
         </div>
     </div>
   );

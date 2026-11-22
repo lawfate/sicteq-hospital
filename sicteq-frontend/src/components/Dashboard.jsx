@@ -36,6 +36,8 @@ const ACCIONES = {
 };
 
 const fecha = (d) => new Date(d).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const ACENTOS = ['bg-primary/10 text-primary', 'bg-accent/10 text-accent', 'bg-lavender/10 text-lavender', 'bg-warn/10 text-warn'];
+const ICONOS_RESUMEN = ['fa-box-open', 'fa-box', 'fa-clipboard-list', 'fa-boxes-stacked'];
 
 export default function Dashboard({ user, onTour }) {
   const navigate = useNavigate();
@@ -135,34 +137,46 @@ export default function Dashboard({ user, onTour }) {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/30 bg-gradient-to-br from-primary/15 via-card to-card p-5 sm:p-6">
-        <div className="space-y-1"><p className="text-sm font-bold text-primary">Central de Esterilización</p><h1 className="text-2xl font-bold sm:text-3xl">Hola, {user?.name?.split(' ')[0] || 'bienvenido'}</h1><p className="text-muted-foreground">Elija una tarea o revise lo que necesita atención.</p></div>
-        <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onTour}><i className="fa-solid fa-route" aria-hidden="true" />Repetir recorrido</Button><Button variant="ghost" disabled={cargando || cargandoCajas} onClick={() => { setErrores({}); setCargando(true); setCargandoCajas(true); setAlertas(null); setRecarga((r) => r + 1); }}>Actualizar Panel</Button></div>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_17rem]" aria-label="Bienvenida y cuenta">
+        <div className="relative flex min-h-56 items-center overflow-hidden rounded-[1.75rem] border border-primary/10 bg-gradient-to-br from-primary/15 via-lavender/10 to-accent/15 p-5 shadow-card sm:p-7">
+          <div className="relative z-10 flex-1 space-y-3 sm:pr-44">
+            <p className="text-sm font-bold text-primary">Su día en la Central</p>
+            <h1 className="text-3xl font-bold sm:text-4xl">Hola, {user?.name?.split(' ')[0] || 'bienvenido'}</h1>
+            <p className="max-w-sm leading-6 text-muted-foreground">Qué bueno tenerle aquí. Su equipo y el recorrido de cada caja, en un mismo lugar.</p>
+            <Button variant="outline" className="border-primary/25 bg-card/80 text-primary" onClick={onTour}><i className="fa-solid fa-route" aria-hidden="true" />Repetir recorrido</Button>
+          </div>
+          <img src="/ilustraciones/equipo-esterilizacion.png" alt="" width="1392" height="1136" className="absolute bottom-0 right-2 hidden h-52 w-48 object-contain object-bottom sm:block" />
+        </div>
+        <Card className="hidden xl:block"><CardContent className="flex h-full flex-col items-center justify-center gap-3 pt-5 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-card bg-lavender/15 text-xl font-bold text-lavender shadow-card">{user?.name?.split(' ').slice(0, 2).map((n) => n[0]).join('')}</div>
+          <div><p className="font-bold">{user?.name}</p><p className="mt-1 text-sm text-muted-foreground">{user?.role === 'Enfermera' ? 'Enfermería' : user?.role}</p></div>
+          <p className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">{new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/clave')}>Mi cuenta <i className="fa-solid fa-arrow-right text-xs" aria-hidden="true" /></Button>
+        </CardContent></Card>
       </section>
       {(errores.panel || errores.historial) && <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-danger">{errores.panel || errores.historial}</p>}
       {ACCIONES[user?.role] && (
         <section aria-label="Acciones rápidas" className="space-y-3">
-          <h2 className="text-xl font-bold">¿Qué necesita hacer?</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">¿Qué necesita hacer?</h2><Button variant="ghost" disabled={cargando || cargandoCajas} onClick={() => { setErrores({}); setCargando(true); setCargandoCajas(true); setAlertas(null); setRecarga((r) => r + 1); }}><i className="fa-solid fa-rotate-right text-xs" aria-hidden="true" />Actualizar Panel</Button></div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {ACCIONES[user.role].map((a) => (
+          {ACCIONES[user.role].map((a, i) => (
             <button
               key={a.texto}
-              className="group flex min-h-24 items-center gap-4 rounded-xl border border-primary/30 bg-card p-4 text-left font-bold transition-colors hover:border-primary hover:bg-primary/10"
+              className="group flex min-h-24 items-center gap-4 rounded-lg border border-border/60 bg-card p-4 text-left font-bold shadow-card transition-colors hover:border-primary/40 hover:bg-primary/5"
               onClick={() => navigate(a.ruta)}
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-xl text-primary"><i className={`fa-solid ${a.icono}`} aria-hidden="true" /></span><span className="flex-1">{a.texto}</span><i className="fa-solid fa-chevron-right text-xs text-muted-foreground" aria-hidden="true" />
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-xl ${ACENTOS[i]}`}><i className={`fa-solid ${a.icono}`} aria-hidden="true" /></span><span className="flex-1">{a.texto}</span><i className="fa-solid fa-chevron-right text-xs text-muted-foreground" aria-hidden="true" />
             </button>
           ))}
           </div>
         </section>
       )}
 
-      {/* Resumen: cuatro números, sin adornos, legibles a distancia */}
-      <section aria-label="Resumen" className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card lg:grid-cols-4">
+      <section aria-label="Resumen" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {resumen.map((r, i) => (
-          <div key={r.titulo} className={`space-y-1 p-5 ${i > 0 ? 'border-l border-border' : ''} ${i === 2 ? 'max-lg:border-l-0 max-lg:border-t' : ''} ${i === 3 ? 'max-lg:border-t' : ''}`}>
-            <p className="text-sm font-bold text-muted-foreground">{r.titulo}</p>
-            <p className={`font-mono text-4xl font-bold tabular-nums ${r.alerta ? 'text-warn' : 'text-primary'}`}>{cargando || errores.panel ? '–' : (r.valor || 0)}</p>
+          <div key={r.titulo} className="space-y-2 rounded-lg border border-border/60 bg-card p-4 shadow-card sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-muted-foreground">{r.titulo}</p><span className={`flex h-8 w-8 items-center justify-center rounded-md ${ACENTOS[i]}`}><i className={`fa-solid ${ICONOS_RESUMEN[i]}`} aria-hidden="true" /></span></div>
+            <p className={`text-4xl font-bold tabular-nums ${r.alerta ? 'text-warn' : 'text-foreground'}`}>{cargando || errores.panel ? '–' : (r.valor || 0)}</p>
             <p className="text-xs text-muted-foreground">{r.nota}</p>
           </div>
         ))}

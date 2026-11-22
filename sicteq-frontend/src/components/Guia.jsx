@@ -152,7 +152,7 @@ export default function Guia({ rol, onCerrar }) {
         aria-modal="true"
         aria-labelledby="guia-titulo"
         aria-describedby="guia-texto"
-        className="relative max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-primary/40 bg-card shadow-xl"
+        className="relative max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[1.75rem] border border-primary/20 bg-card shadow-soft"
       >
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
           <span className="text-sm font-bold text-primary">Su recorrido · {rol === 'Enfermera' ? 'Enfermería' : rol}</span>
@@ -169,7 +169,7 @@ export default function Guia({ rol, onCerrar }) {
             {pasos.map((p, i) => <button key={p.titulo} aria-current={paso === i ? 'step' : undefined} onClick={() => setPaso(i)} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-lg p-2 text-left text-sm ${paso === i ? 'bg-primary/15 font-bold text-primary' : 'text-muted-foreground hover:bg-muted'}`}><span className="font-mono">{i + 1}.</span><span className="hidden sm:inline">{i === 0 ? 'Para comenzar' : i === pasos.length - 1 ? 'Su cuenta y ayuda' : p.titulo}</span><span className="sr-only sm:hidden">{p.titulo}</span></button>)}
           </nav>
           <div className="space-y-5 p-5 sm:p-6" aria-live="polite">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-2xl text-primary"><i className={`fa-solid ${paso === 0 ? 'fa-route' : ultimoPaso ? 'fa-circle-check' : 'fa-clipboard-check'}`} aria-hidden="true" /></div>
+            {paso === 0 ? <div className="flex h-36 items-end justify-center overflow-hidden rounded-lg bg-gradient-to-br from-accent/10 to-lavender/15"><img src="/ilustraciones/equipo-esterilizacion.png" alt="" width="1392" height="1136" className="h-36 w-48 object-contain object-bottom" /></div> : <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${ultimoPaso ? 'bg-accent/10 text-accent' : 'bg-lavender/10 text-lavender'}`}><i className={`fa-solid ${ultimoPaso ? 'fa-circle-check' : 'fa-clipboard-check'}`} aria-hidden="true" /></div>}
             <h2 id="guia-titulo" className="text-2xl font-bold">
               {pasoActual.titulo}
             </h2>

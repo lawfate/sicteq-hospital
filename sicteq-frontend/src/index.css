@@ -7,52 +7,62 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tema oscuro operativo SICTEQ (H S% L%). Fondo azul petróleo casi negro, un solo
-   color de acción (cian clínico) y colores solo para estados de la caja:
-   ok = estéril / lista, warn = en proceso / por vencer, danger = bloqueada / vencida. */
+/* Colores semánticos del diseño: superficies suaves, azul de navegación,
+   turquesa y lavanda de apoyo. Los estados conservan ok, warn y danger. */
 @layer base {
-  :root {
+  :root[data-tema='oscuro'] {
     color-scheme: dark;
-    --background: 215 30% 9%;
-    --card: 212 28% 14%;
-    --muted: 212 24% 20%;
-    --border: 210 20% 29%;
-    --foreground: 200 20% 93%;
-    --muted-foreground: 205 16% 72%;
-    --primary: 188 78% 46%;
-    --primary-foreground: 210 30% 7%;
-    --ok: 150 58% 46%;
-    --warn: 38 92% 56%;
-    --danger: 2 78% 62%;
+    --background: 226 32% 10%;
+    --card: 226 28% 15%;
+    --muted: 225 25% 21%;
+    --border: 225 20% 30%;
+    --foreground: 220 35% 94%;
+    --muted-foreground: 222 20% 74%;
+    --primary: 224 90% 77%;
+    --primary-foreground: 228 36% 12%;
+    --accent: 177 55% 65%;
+    --lavender: 260 83% 80%;
+    --ok: 157 54% 64%;
+    --warn: 38 92% 70%;
+    --danger: 350 82% 77%;
+    --navigation: 230 45% 20%;
+    --navigation-foreground: 220 45% 98%;
+    --shadow: 230 55% 3%;
   }
-  /* Modo claro opcional (oficinas con mucha luz, impresión de pantalla). Mismos
-     nombres de color: solo cambian los valores. Acción y estados más oscuros
-     para mantener el contraste sobre blanco. */
-  :root[data-tema='claro'] {
+  /* Tema claro de bienvenida; se puede elegir oscuro desde el menú. */
+  :root, :root[data-tema='claro'] {
     color-scheme: light;
-    --background: 210 20% 96%;
+    --background: 222 55% 96%;
     --card: 0 0% 100%;
-    --muted: 210 20% 92%;
-    --border: 210 16% 80%;
-    --foreground: 210 32% 12%;
-    --muted-foreground: 210 12% 36%;
-    --primary: 190 85% 26%;
+    --muted: 222 45% 95%;
+    --border: 222 28% 88%;
+    --foreground: 226 36% 20%;
+    --muted-foreground: 223 18% 43%;
+    --primary: 226 72% 51%;
     --primary-foreground: 0 0% 100%;
-    --ok: 150 66% 27%;
-    --warn: 30 92% 30%;
-    --danger: 2 72% 44%;
+    --accent: 181 65% 28%;
+    --lavender: 260 52% 49%;
+    --ok: 157 64% 27%;
+    --warn: 29 85% 32%;
+    --danger: 349 67% 43%;
+    --navigation: 228 62% 46%;
+    --navigation-foreground: 220 45% 98%;
+    --shadow: 226 45% 35%;
   }
   html, body, #root { height: 100%; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-size: 16px;
   }
+  main { scrollbar-gutter: stable; }
   :focus-visible { @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background; }
   button, a, input, select, textarea, summary { touch-action: manipulation; }
   @media (pointer: coarse) {
     button, select, summary { min-height: 48px; }
     input { min-height: 48px; font-size: 16px; }
   }
+  .app-content .bg-card { box-shadow: 0 5px 24px -8px hsl(var(--shadow) / 0.14); }
+  .app-content table thead { background: hsl(var(--muted) / 0.7); }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }

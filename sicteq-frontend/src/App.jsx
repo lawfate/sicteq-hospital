@@ -140,7 +140,7 @@ function App() {
             </div>
           )}
           <Header onMenuClick={() => setMenuAbierto(true)} onAyuda={() => setGuia(true)} />
-          <main id="contenido" tabIndex={-1} className="flex-1 overflow-y-auto p-4 md:p-6 xl:p-8">
+          <main id="contenido" tabIndex={-1} className="app-content flex-1 overflow-y-auto p-4 md:p-6 xl:p-8">
               <Routes>
                 <Route path="/" element={<Dashboard user={user} onTour={() => setGuia(true)} />} />
                 
