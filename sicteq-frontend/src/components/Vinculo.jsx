@@ -38,7 +38,7 @@ export default function Vinculo({ user }) {
     }
   };
 
-  // Acción 1: Vínculo Clínico (Enfermera) — ahora persiste de verdad, ya no es un alert()
+  // Guarda la asociación y actualiza el historial del paciente.
   const handleVinculoClinico = async (e) => {
     e.preventDefault();
     if (!selectedPatient) return alert("ERROR: Debe buscar y seleccionar un paciente.");
@@ -74,8 +74,7 @@ export default function Vinculo({ user }) {
     <div className="space-y-6">
 
       {/* Vínculo clínico */}
-      {(
-        <div className="space-y-6">
+      <div className="space-y-6">
 
           {/* Sección de pacientes: buscador + listado visible con estado de vínculo */}
           <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -222,7 +221,6 @@ export default function Vinculo({ user }) {
           </div>
         </div>
         </div>
-      )}
     </div>
   );
 }

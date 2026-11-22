@@ -22,31 +22,34 @@ import Indicadores from './components/Indicadores'
 import Etiquetas from './components/Etiquetas'
 import { Button } from '@/components/ui/button'
 
+function restaurarUsuario() {
+  try {
+    const token = localStorage.getItem('sicteq_token');
+    const storedUser = localStorage.getItem('sicteq_user');
+    return token && storedUser ? JSON.parse(storedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 function App() {
-  const [user, setUser] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [user, setUser] = useState(restaurarUsuario);
   const [menuAbierto, setMenuAbierto] = useState(false); // menú lateral en pantallas chicas
   const [guia, setGuia] = useState(false);
 
-  // Antes la sesión vivía solo en useState: un F5, o abrir un link en
-  // pestaña nueva, botaba al login sin ninguna razón real. El token y el
-  // usuario quedan en localStorage (los guarda Login.jsx), así que acá solo
-  // hay que releerlos al montar.
+  // Si el usuario guardado está dañado, se descarta también su token.
   useEffect(() => {
-    const token = localStorage.getItem('sicteq_token');
     const storedUser = localStorage.getItem('sicteq_user');
-    if (token && storedUser) {
+    if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        JSON.parse(storedUser);
       } catch {
         localStorage.removeItem('sicteq_token');
         localStorage.removeItem('sicteq_user');
       }
     }
-    setCheckingSession(false);
   }, []);
 
-  // Lógica de Login actualizada para recibir los datos reales desde la BD
   // La guía se abre sola la primera vez que cada persona entra en este equipo.
   const claveGuia = (u) => `sicteq_guia_vista_${u?.id}`;
   const guiaVista = (u) => { try { return localStorage.getItem(claveGuia(u)) === '1'; } catch { return true; } };
@@ -110,10 +113,6 @@ function App() {
 
   // Una pantalla que el rol no usa no existe para él: se vuelve al Panel.
   const soloSiPuede = (ruta, pantalla) => (puedeVer(pantallaDe(ruta), user?.role) ? pantalla : <Navigate to="/" replace />);
-
-  if (checkingSession) {
-    return null;
-  }
 
   if (!user) {
     return <Login onLogin={handleLogin} />;

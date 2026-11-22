@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
+import { useReporte } from '../useReporte';
 import { toCSV } from '../csv';
 import { descargarXlsx } from '../xlsx';
 import { nombreEstado } from '@/etapas';
@@ -115,8 +116,8 @@ function ReporteTrazabilidad() {
   const [codigo, setCodigo] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, error, cargar } = useReporte('/api/reportes/trazabilidad');
+  const rows = Array.isArray(data) ? data.map(row => ({ ...row, estado_nuevo: nombreEstado(row.estado_nuevo) })) : [];
 
   const columns = [
     { key: 'fecha_cambio', label: 'Fecha', render: r => fmt(r.fecha_cambio) },
@@ -131,27 +132,13 @@ function ReporteTrazabilidad() {
     { key: 'justificacion', label: 'Justificación' }
   ];
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (codigo.trim()) params.set('codigo', codigo.trim().toUpperCase());
-      if (desde) params.set('desde', desde);
-      if (hasta) params.set('hasta', hasta);
-      const res = await apiFetch(`/api/reportes/trazabilidad?${params.toString()}`);
-      const data = await res.json();
-      setRows(Array.isArray(data) ? data.map(row => ({
-        ...row,
-        estado_nuevo: nombreEstado(row.estado_nuevo)
-      })) : []);
-    } catch (err) {
-      console.error('Error al cargar reporte de trazabilidad:', err);
-    } finally {
-      setLoading(false);
-    }
+  const load = () => {
+    const params = new URLSearchParams();
+    if (codigo.trim()) params.set('codigo', codigo.trim().toUpperCase());
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    cargar(params);
   };
-
-  useEffect(() => { load(); }, []);
 
   return (
     <div className="space-y-4">
@@ -162,6 +149,7 @@ function ReporteTrazabilidad() {
         <Field label="Desde"><input type="date" className={inputCls} value={desde} onChange={e => setDesde(e.target.value)} /></Field>
         <Field label="Hasta"><input type="date" className={inputCls} value={hasta} onChange={e => setHasta(e.target.value)} /></Field>
       </FilterBar>
+      {error && <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>}
       <ReportTable
         columns={columns}
         rows={rows}
@@ -178,8 +166,8 @@ function ReporteSolicitudes() {
   const [estado, setEstado] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, error, cargar } = useReporte('/api/solicitudes');
+  const rows = Array.isArray(data) ? data : [];
 
   const columns = [
     { key: 'fecha_creacion', label: 'Fecha', render: r => fmt(r.fecha_creacion) },
@@ -190,30 +178,19 @@ function ReporteSolicitudes() {
     { key: 'usuario_nombre', label: 'Solicitado por' }
   ];
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (areaId) params.set('area_id', areaId);
-      if (estado) params.set('estado', estado);
-      if (desde) params.set('desde', desde);
-      if (hasta) params.set('hasta', hasta);
-      const res = await apiFetch(`/api/solicitudes?${params.toString()}`);
-      const data = await res.json();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error al cargar reporte de solicitudes:', err);
-    } finally {
-      setLoading(false);
-    }
+  const load = () => {
+    const params = new URLSearchParams();
+    if (areaId) params.set('area_id', areaId);
+    if (estado) params.set('estado', estado);
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    cargar(params);
   };
-
   useEffect(() => {
     apiFetch(`/api/solicitudes/areas`)
       .then(res => res.json())
       .then(data => setAreas(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error al cargar áreas:', err));
-    load();
   }, []);
 
   return (
@@ -234,6 +211,7 @@ function ReporteSolicitudes() {
         <Field label="Desde"><input type="date" className={inputCls} value={desde} onChange={e => setDesde(e.target.value)} /></Field>
         <Field label="Hasta"><input type="date" className={inputCls} value={hasta} onChange={e => setHasta(e.target.value)} /></Field>
       </FilterBar>
+      {error && <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>}
       <ReportTable
         columns={columns}
         rows={rows}
@@ -245,9 +223,9 @@ function ReporteSolicitudes() {
 }
 
 function ReporteAlertas() {
-  const [stockBajo, setStockBajo] = useState([]);
-  const [cajasPorVencer, setCajasPorVencer] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, error, cargar } = useReporte('/api/alertas');
+  const stockBajo = Array.isArray(data?.stockBajo) ? data.stockBajo : [];
+  const cajasPorVencer = Array.isArray(data?.cajasPorVencer) ? data.cajasPorVencer : [];
 
   const colsStock = [
     { key: 'nombre_equipo', label: 'Instrumental' },
@@ -265,21 +243,7 @@ function ReporteAlertas() {
     { key: 'dias_restantes', label: 'Días restantes' }
   ];
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/api/alertas`);
-      const data = await res.json();
-      setStockBajo(Array.isArray(data.stockBajo) ? data.stockBajo : []);
-      setCajasPorVencer(Array.isArray(data.cajasPorVencer) ? data.cajasPorVencer : []);
-    } catch (err) {
-      console.error('Error al cargar alertas:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  const load = () => cargar();
 
   return (
     <div className="space-y-6">
@@ -288,6 +252,7 @@ function ReporteAlertas() {
           <i className={`fa-solid fa-arrows-rotate ${loading ? 'animate-spin' : ''}`}></i> Actualizar
         </button>
       </div>
+      {error && <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>}
       <div>
         <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">Stock bajo o en alerta</h4>
         <ReportTable
@@ -315,8 +280,8 @@ function ReporteVinculos() {
   const [codigo, setCodigo] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, error, cargar } = useReporte('/api/reportes/vinculos');
+  const rows = Array.isArray(data) ? data : [];
 
   const columns = [
     { key: 'fecha_vinculo', label: 'Fecha', render: r => fmt(r.fecha_vinculo) },
@@ -329,25 +294,14 @@ function ReporteVinculos() {
     { key: 'vinculado_por', label: 'Vinculado por' }
   ];
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (rut.trim()) params.set('rut', rut.trim());
-      if (codigo.trim()) params.set('codigo', codigo.trim().toUpperCase());
-      if (desde) params.set('desde', desde);
-      if (hasta) params.set('hasta', hasta);
-      const res = await apiFetch(`/api/reportes/vinculos?${params.toString()}`);
-      const data = await res.json();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error al cargar reporte de vínculos:', err);
-    } finally {
-      setLoading(false);
-    }
+  const load = () => {
+    const params = new URLSearchParams();
+    if (rut.trim()) params.set('rut', rut.trim());
+    if (codigo.trim()) params.set('codigo', codigo.trim().toUpperCase());
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    cargar(params);
   };
-
-  useEffect(() => { load(); }, []);
 
   return (
     <div className="space-y-4">
@@ -361,6 +315,7 @@ function ReporteVinculos() {
         <Field label="Desde"><input type="date" className={inputCls} value={desde} onChange={e => setDesde(e.target.value)} /></Field>
         <Field label="Hasta"><input type="date" className={inputCls} value={hasta} onChange={e => setHasta(e.target.value)} /></Field>
       </FilterBar>
+      {error && <p role="alert" className="rounded-md border border-danger/40 bg-danger/15 p-3 text-sm font-bold text-danger">{error}</p>}
       <ReportTable
         columns={columns}
         rows={rows}
@@ -382,9 +337,8 @@ const duracion = (min) => {
 function ReporteTiempos() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { data, loading, error, cargar } = useReporte('/api/reportes/tiempos');
+  const rows = Array.isArray(data) ? data : [];
 
   const columns = [
     { key: 'estado', label: 'Etapa', render: r => nombreEstado(r.estado) },
@@ -394,26 +348,12 @@ function ReporteTiempos() {
     { key: 'promedio_min', label: 'Promedio', render: r => duracion(r.promedio_min) },
   ];
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (desde) params.set('desde', desde);
-      if (hasta) params.set('hasta', `${hasta} 23:59:59`);
-      const res = await apiFetch(`/api/reportes/tiempos?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo calcular el reporte.');
-      setRows(Array.isArray(data) ? data : []);
-      setError('');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  const load = () => {
+    const params = new URLSearchParams();
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', `${hasta} 23:59:59`);
+    cargar(params);
   };
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial; load cambia estado tras el await
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
