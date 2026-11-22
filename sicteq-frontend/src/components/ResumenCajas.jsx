@@ -28,7 +28,7 @@ export default function ResumenCajas({ cajas, cargando, error, onAbrir }) {
               <button key={e.id} aria-pressed={etapa === e.id} onClick={() => { setEtapa(etapa === e.id ? null : e.id); setMostrar(true); }}
                 className={`rounded-lg border p-3 text-left transition-colors ${etapa === e.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>
                 <span className="flex justify-between gap-3 text-sm font-bold"><span>{e.nombre}</span><span className="font-mono">{e.cantidad}</span></span>
-                <span className="mt-2 block h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true"><span className={`block h-full rounded-full ${e.id === 5 ? 'bg-ok' : 'bg-primary'}`} style={{ width: `${cajas.length ? e.cantidad / cajas.length * 100 : 0}%` }} /></span>
+                <span className="mt-3 block h-2.5 overflow-hidden rounded-full bg-muted" aria-hidden="true"><span className={`block h-full rounded-full ${e.id === 5 ? 'bg-ok' : [2, 6].includes(e.id) ? 'bg-accent' : e.id === 3 ? 'bg-lavender' : 'bg-primary'}`} style={{ width: `${cajas.length ? e.cantidad / cajas.length * 100 : 0}%` }} /></span>
               </button>
             ))}
           </div>

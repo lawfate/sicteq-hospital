@@ -4,7 +4,7 @@ Instrucciones para agentes de código (Codex, Claude, Copilot) que trabajen en e
 
 ## Proyecto
 Trazabilidad de cajas de instrumental de una Central de Esterilización hospitalaria.
-- `sicteq-frontend/`: React 19 + Vite + Tailwind. Componentes propios en `src/components/ui`. Colores SOLO con tokens (`bg-card`, `text-muted-foreground`, `text-ok`, `text-warn`, `text-danger`, `bg-primary`…) definidos en `src/index.css` (tema oscuro por defecto y `:root[data-tema='claro']`). Nada de colores sueltos.
+- `sicteq-frontend/`: React 19 + Vite + Tailwind. Componentes propios en `src/components/ui`. Diseño claro y cercano por defecto, basado en las referencias visuales de Diego: tarjetas blancas, esquinas redondeadas, navegación azul y acentos pastel. Tema oscuro opcional. Colores SOLO con tokens (`bg-card`, `text-muted-foreground`, `text-ok`, `text-warn`, `text-danger`, `bg-primary`, `text-accent`, `text-lavender`…) definidos en `src/index.css` y `:root[data-tema='claro']`. Nada de colores sueltos. Conservar textos legibles y controles táctiles.
 - `sicteq-backend/`: Node + Express + pg (CommonJS). Consultas siempre parametrizadas. Roles en `src/middleware/authMiddleware.js` (`ROLES`, `requireRole`); el backend valida todo aunque el frontend esconda cosas.
 - Migraciones aditivas e idempotentes en `sicteq-backend/migrations/` (`node migrations/aplicar.js`).
 

@@ -55,14 +55,17 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background p-4">
-      <div className="w-full max-w-sm space-y-8">
-        <div className="space-y-2">
-          <p className="font-mono text-3xl font-bold tracking-[0.25em] text-primary">SICTEQ</p>
-          <p className="text-muted-foreground">Trazabilidad de la Central de Esterilización<br />Hospital Dr. Franco Ravera Zunino</p>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-background p-4 sm:p-8">
+      <div className="mx-auto flex min-h-full max-w-6xl items-center justify-center">
+      <div className="grid w-full overflow-hidden rounded-[2rem] border border-border/60 bg-card shadow-soft lg:grid-cols-[1.1fr_1fr]">
+        <div className="relative flex flex-col justify-between gap-6 bg-gradient-to-br from-primary/10 via-lavender/10 to-accent/15 p-6 sm:p-10">
+          <div><p className="text-3xl font-bold tracking-widest text-primary">SICTEQ</p><p className="mt-2 text-sm text-muted-foreground">Hospital Dr. Franco Ravera Zunino</p></div>
+          <div className="max-w-md space-y-3"><h1 className="text-3xl font-bold sm:text-4xl">Cada caja, en buenas manos.</h1><p className="leading-7 text-muted-foreground">Un espacio para acompañar el trabajo de la Central de Esterilización, desde la recepción hasta la entrega a pabellón.</p></div>
+          <img src="/ilustraciones/equipo-esterilizacion.png" alt="" width="1392" height="1136" className="mx-auto hidden h-64 w-full object-contain lg:block" />
         </div>
-
-        <form onSubmit={handleLogin} className="space-y-5 rounded-lg border border-border bg-card p-6">
+        <div className="space-y-6 p-6 sm:p-10 lg:py-16">
+        <div className="space-y-2"><p className="text-sm font-bold text-accent">Bienvenido a su espacio de trabajo</p><h2 className="text-2xl font-bold">Iniciar sesión</h2><p className="text-sm text-muted-foreground">Ingrese con su RUT y contraseña para continuar.</p></div>
+        <form onSubmit={handleLogin} className="space-y-5">
           {motivoSalida && !error && (
             <p role="status" className="rounded-md border border-warn/40 bg-warn/15 p-3 text-sm font-bold text-warn">{motivoSalida}</p>
           )}
@@ -85,6 +88,8 @@ export default function Login({ onLogin }) {
         </form>
 
         <p className="text-xs text-muted-foreground">Cada persona entra con su propia cuenta. La sesión se cierra sola tras 30 minutos sin uso.</p>
+        </div>
+      </div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 // shadcn/ui Button. Tamaños generosos: se usa en pantallas táctiles y por
 // personal con poca práctica digital.
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-bold transition-colors disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-bold transition-colors active:translate-y-px disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {

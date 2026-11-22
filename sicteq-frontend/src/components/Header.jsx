@@ -39,7 +39,7 @@ export default function Header({ onMenuClick, onAyuda }) {
   };
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 md:px-6">
+    <header className="mx-3 mt-3 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-card px-4 py-3 shadow-card md:mx-6 md:mt-4 md:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick} aria-label="Abrir menú">
           <i className="fa-solid fa-bars text-lg" aria-hidden="true"></i>

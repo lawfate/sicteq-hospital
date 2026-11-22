@@ -28,5 +28,5 @@ export function Textarea({ className, ...props }) {
 }
 
 export function Label({ className, ...props }) {
-  return <label className={cn('block text-xs font-bold uppercase tracking-wider text-muted-foreground', className)} {...props} />;
+  return <label className={cn('block text-sm font-bold text-foreground', className)} {...props} />;
 }
