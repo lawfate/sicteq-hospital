@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Modal from './Modal';
 import Estacion from './Estacion';
@@ -46,9 +46,14 @@ const SIGUIENTE = {
 
 const METODOS_ESTERILIZACION = ["Autoclave", "Óxido de Etileno", "Plasma de Peróxido de Hidrógeno"];
 
-export default function Ciclo() {
+export default function Ciclo({ user }) {
   const navigate = useNavigate();
-  const [modo, setModo] = useState('caja'); // 'caja' | 'estacion'
+  const [modo, setModo] = useState(() => ({ estacion: 'estacion', registrar: 'caja' }[new URLSearchParams(window.location.search).get('modo')] || 'revisar'));
+  const consulta = useRef(0);
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState('');
+  const [errorAccion, setErrorAccion] = useState('');
+  const [historialCompleto, setHistorialCompleto] = useState(false);
   const [avance, setAvance] = useState({ enviando: false, mensaje: '', ok: false });
   const [ficha, setFicha] = useState(null); // tipo, piezas y estante de la caja en pantalla
   const [contadas, setContadas] = useState('');
@@ -70,9 +75,17 @@ export default function Ciclo() {
 
   // Recibe el código explícito: del campo, de la URL (?codigo= desde la cabecera) o de la caja activa.
   const handleSearch = useCallback(async (codigoParam) => {
+    const codigo = String(codigoParam || '').trim().toUpperCase();
+    if (!codigo) return;
+    const turno = ++consulta.current;
+    setSearchText('');
+    setBuscando(true);
+    setErrorBusqueda('');
+    setActiveBox(null);
+    setFicha(null);
+    setPacientesVinculados([]);
+    setHistorialCompleto(false);
     try {
-      const codigo = String(codigoParam || '').trim().toUpperCase();
-      if (!codigo) return;
 
       const response = await apiFetch(`/api/trazabilidad/buscar/${encodeURIComponent(codigo)}`);
 
@@ -83,6 +96,13 @@ export default function Ciclo() {
       }
 
       const data = await response.json();
+      const [ficha, pacientes] = await Promise.all([
+        fichaCaja(codigo),
+        ['Enfermera', 'IT'].includes(user?.role)
+          ? apiFetch(`/api/cajas/${encodeURIComponent(codigo)}/pacientes`).then((r) => r.ok ? r.json() : []).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+      if (turno !== consulta.current) return;
 
       // 2. Validamos que el backend realmente envió un historial y no un array vacío
       if (!data || data.length === 0) {
@@ -103,29 +123,34 @@ export default function Ciclo() {
           stage: stageActual
       });
       setTargetStage(stageActual);
-      setSearchText(codigo);
 
       setLogs(data);
-      fichaCaja(codigo).then((f) => { setFicha(f); setContadas(f?.piezas ? String(f.piezas) : ''); });
+      setFicha(ficha);
+      setContadas(ficha?.piezas ? String(ficha.piezas) : '');
+      setPacientesVinculados(Array.isArray(pacientes) ? pacientes : []);
 
       // Dirección caja -> paciente de la trazabilidad bidireccional: qué
       // paciente(s) se le vincularon a esta caja física, si los hay.
-      apiFetch(`/api/cajas/${encodeURIComponent(codigo)}/pacientes`)
-        .then(r => r.ok ? r.json() : [])
-        .then(p => setPacientesVinculados(Array.isArray(p) ? p : []))
-        .catch(() => setPacientesVinculados([]));
     } catch (err) {
-      alert("Problema al buscar: " + err.message);
+      if (turno === consulta.current) { setErrorBusqueda(`${codigo}: ${err.message}`); bip(false); }
+    } finally {
+      if (turno === consulta.current) setBuscando(false);
     }
-  }, []);
+  }, [user]);
 
   const codigoUrl = searchParams.get('codigo');
+  const modoUrl = searchParams.get('modo');
 
   useEffect(() => {
-    if (!codigoUrl) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- handleSearch cambia estado recién tras el await, no en el cuerpo del efecto
-    handleSearch(codigoUrl);
-  }, [codigoUrl, navegacion, handleSearch]);
+    let vigente = true;
+    queueMicrotask(() => {
+      if (!vigente) return;
+      if (codigoUrl) { setModo('revisar'); handleSearch(codigoUrl); }
+      else if (modoUrl === 'estacion') setModo('estacion');
+      else if (modoUrl === 'registrar') setModo('caja');
+    });
+    return () => { vigente = false; };
+  }, [codigoUrl, modoUrl, navegacion, handleSearch]);
 
   const paramsCompletados = temperatura.trim() !== '' || presion.trim() !== '' || tiempoMinutos.trim() !== '';
   const esRetroceso = activeBox && targetStage < activeBox.stage;
@@ -138,16 +163,17 @@ export default function Ciclo() {
     if (isSubmitting) return;
 
     if (esRetroceso && !rollbackReason.trim()) {
-      alert("ERROR: Debe ingresar el motivo técnico del retroceso.");
+      setErrorAccion('Escriba el motivo del retroceso.');
       return;
     }
 
     if (requiereJustificarSinParametros && !rollbackReason.trim()) {
-      alert("ERROR: Para pasar a esta etapa debe completar los parámetros de esterilización, o dejar un comentario que justifique por qué no los tiene.");
+      setErrorAccion('Complete los datos del ciclo o explique por qué no los tiene.');
       return;
     }
 
     setIsSubmitting(true);
+    setErrorAccion('');
     try {
       // Usamos la caja ya cargada (activeBox), no el input de busqueda en vivo:
       // si el usuario edita o borra el campo despues de buscar pero antes de
@@ -187,12 +213,14 @@ export default function Ciclo() {
       setTiempoMinutos("");
       setVigenciaDias("365");
       setIsModalOpen(false);
-      alert("Etapa actualizada con éxito");
+      setAvance({ codigo: activeBox.codigo, ok: true, mensaje: 'Etapa actualizada con éxito.' });
+      bip(true);
 
       handleSearch(activeBox.codigo);
 
     } catch (err) {
-      alert("No se pudo procesar la acción: " + err.message);
+      setErrorAccion('No se pudo registrar: ' + err.message);
+      bip(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -220,14 +248,15 @@ export default function Ciclo() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="inline-flex rounded-md border border-border bg-card p-1" role="radiogroup" aria-label="Forma de trabajo">
-        {[['caja', 'Una caja'], ['estacion', 'Modo estación']].map(([id, texto]) => (
-          <button key={id} type="button" role="radio" aria-checked={modo === id} onClick={() => setModo(id)}
-            className={`rounded px-4 py-2 text-sm font-bold transition-colors ${modo === id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+      <div className="grid gap-2 rounded-xl border border-border bg-card p-2 sm:grid-cols-3" aria-label="Forma de trabajo">
+        {[['revisar', 'Consultar una caja'], ['caja', 'Registrar un avance'], ['estacion', 'Trabajar por estación']].map(([id, texto]) => (
+          <button key={id} type="button" aria-pressed={modo === id} disabled={avance.enviando || isSubmitting} onClick={() => setModo(id)}
+            className={`min-h-12 rounded-lg px-4 py-3 text-sm font-bold transition-colors ${modo === id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
             {texto}
           </button>
         ))}
       </div>
+      <p className="text-sm text-muted-foreground">{modo === 'estacion' ? 'Para varias cajas: elija su estación y registre cada escaneo.' : modo === 'caja' ? 'Busque una caja y registre su siguiente paso.' : 'Busque una caja para ver su ubicación, etapa e historial.'}</p>
 
       {modo === 'estacion' ? <Estacion /> : (<>
       {/* Escáner: lo primero y lo más grande de la pantalla */}
@@ -241,6 +270,7 @@ export default function Ciclo() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchText)}
+              disabled={avance.enviando || isSubmitting}
               // PB-06: listo para la pistola apenas se abre la pantalla; al volver
               // a enfocarlo se selecciona el texto, así el siguiente escaneo lo reemplaza.
               autoFocus
@@ -249,9 +279,11 @@ export default function Ciclo() {
               className="h-14 font-mono text-xl uppercase tracking-widest"
             />
           </div>
-          <Button size="lg" onClick={() => handleSearch(searchText)}>Buscar caja</Button>
+          <Button size="lg" disabled={avance.enviando || isSubmitting || !searchText.trim()} onClick={() => handleSearch(searchText)}>Buscar caja</Button>
         </CardContent>
       </Card>
+      {buscando && <p role="status" className="text-primary">Buscando caja…</p>}
+      {errorBusqueda && <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 p-4 font-bold text-danger">{errorBusqueda}</p>}
 
       {!activeBox && (
         <p className="text-muted-foreground">Al escanear una caja verá en qué etapa está, su historial y podrá moverla a la siguiente.</p>
@@ -259,9 +291,9 @@ export default function Ciclo() {
 
       {activeBox && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
+
             {/* Línea de tiempo */}
-            <Card>
+            <Card className="lg:col-span-3">
               <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
                 <div className="min-w-[12rem] flex-1 space-y-1">
                   <CardTitle className="whitespace-nowrap font-mono text-2xl">{activeBox.codigo}</CardTitle>
@@ -292,43 +324,14 @@ export default function Ciclo() {
               </CardContent>
             </Card>
 
-            {/* Bitácora */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Historial de la caja</CardTitle>
-                <CardDescription>Del movimiento más reciente al más antiguo.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {logs.map((log, idx) => (
-                  <div key={idx} className="grid gap-1 rounded-md border border-border bg-background p-3 sm:grid-cols-[10rem_1fr]">
-                    <p className="font-mono text-sm text-muted-foreground">{log.fecha_cambio ? new Date(log.fecha_cambio).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : log.time}</p>
-                    <div className="space-y-1">
-                      <Badge variant={varianteEstado(log.estado_nuevo)}>{nombreEstado(log.estado_nuevo || log.event)}</Badge>
-                      {log.metodo_esterilizacion && (
-                        <p className="font-mono text-sm text-primary">
-                          {log.metodo_esterilizacion}
-                          {log.temperatura ? ` · ${log.temperatura} °C` : ''}
-                          {log.presion ? ` · ${log.presion}` : ''}
-                          {log.tiempo_minutos ? ` · ${log.tiempo_minutos} min` : ''}
-                        </p>
-                      )}
-                      {log.justificacion && log.justificacion !== `Avance a ${log.estado_nuevo}` && (
-                        <p className="text-sm text-muted-foreground">{log.justificacion}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
           <div className="space-y-6">
             {/* Mover de etapa */}
             <Card>
               <CardHeader>
-                <CardTitle>Siguiente paso</CardTitle>
+                <CardTitle>{modo === 'revisar' ? 'Ubicación y etapa actual' : 'Siguiente paso'}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {modo === 'revisar' ? <><p className="font-bold text-primary">{ETAPAS.find((e) => e.id === activeBox.stage)?.nombre}</p><p className="text-muted-foreground">{ficha?.estante ? `Estante ${ficha.estante}` : 'Sin estante registrado'}</p><Button className="w-full" onClick={() => setModo('caja')}>Registrar un avance</Button></> : <>
                 {siguiente?.nota && <p className="text-sm text-muted-foreground">{siguiente.nota}</p>}
                 {siguiente?.etapa === 1 && ficha?.piezas && (
                   <div className="space-y-1.5">
@@ -356,8 +359,9 @@ export default function Ciclo() {
                   </Select>
                 </div>
                 {esRetroceso && <p className="rounded-md border border-warn/40 bg-warn/15 p-3 text-sm font-bold text-warn">Es un retroceso: tendrá que escribir el motivo.</p>}
-                <Button variant="secondary" className="w-full" onClick={() => setIsModalOpen(true)}>Continuar</Button>
+                <Button variant="secondary" className="w-full" disabled={avance.enviando} onClick={() => { setErrorAccion(''); setIsModalOpen(true); }}>Continuar</Button>
                 </details>
+                </>}
               </CardContent>
             </Card>
 
@@ -381,6 +385,35 @@ export default function Ciclo() {
               </Card>
             )}
           </div>
+            {/* Bitácora */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Historial de la caja</CardTitle>
+                <CardDescription>Del movimiento más reciente al más antiguo.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {(historialCompleto ? logs : logs.slice(0, 5)).map((log, idx) => (
+                  <div key={idx} className="grid gap-1 rounded-md border border-border bg-background p-3 sm:grid-cols-[10rem_1fr]">
+                    <p className="font-mono text-sm text-muted-foreground">{log.fecha_cambio ? new Date(log.fecha_cambio).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : log.time}</p>
+                    <div className="space-y-1">
+                      <Badge variant={varianteEstado(log.estado_nuevo)}>{nombreEstado(log.estado_nuevo || log.event)}</Badge>
+                      {log.metodo_esterilizacion && (
+                        <p className="font-mono text-sm text-primary">
+                          {log.metodo_esterilizacion}
+                          {log.temperatura ? ` · ${log.temperatura} °C` : ''}
+                          {log.presion ? ` · ${log.presion}` : ''}
+                          {log.tiempo_minutos ? ` · ${log.tiempo_minutos} min` : ''}
+                        </p>
+                      )}
+                      {log.justificacion && log.justificacion !== `Avance a ${log.estado_nuevo}` && (
+                        <p className="text-sm text-muted-foreground">{log.justificacion}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {logs.length > 5 && <Button variant="secondary" aria-expanded={historialCompleto} onClick={() => setHistorialCompleto(!historialCompleto)}>{historialCompleto ? 'Ver solo los 5 últimos' : `Ver historial completo (${logs.length})`}</Button>}
+              </CardContent>
+            </Card>
         </div>
       )}
 
@@ -392,6 +425,7 @@ export default function Ciclo() {
         content={{ title: `Mover ${activeBox?.codigo || ''} a ${etapaDestino?.nombre || ''}` }}
       >
         <div className="space-y-4">
+          {errorAccion && <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-danger">{errorAccion}</p>}
           {requiereProbarEsterilizacion(targetStage) && (
             <div className="space-y-3 rounded-md border border-primary/40 bg-primary/10 p-4">
               <p className="text-sm font-bold">Resultado del ciclo de esterilización</p>

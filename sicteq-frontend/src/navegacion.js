@@ -4,18 +4,28 @@
 // quién la ve (roles): lo que un rol no puede usar no se le muestra.
 export const SECCIONES = [
   {
-    titulo: 'Operación diaria',
+    titulo: 'Inicio',
     items: [
       { ruta: '/', nombre: 'Panel de la Central', icono: 'fa-table-columns', ayuda: 'Qué requiere atención hoy' },
+    ],
+  },
+  {
+    titulo: 'Procesar cajas',
+    items: [
       { ruta: '/ciclo', nombre: 'Seguimiento de cajas', icono: 'fa-barcode', ayuda: 'Recepción, lavado, preparación y bodega' },
       { ruta: '/autoclave', nombre: 'Cargas de autoclave', icono: 'fa-temperature-high', ayuda: 'Registrar y liberar cargas' },
+    ],
+  },
+  {
+    titulo: 'Pabellón',
+    items: [
       { ruta: '/solicitudes', nombre: 'Pedidos de pabellón', icono: 'fa-clipboard-list', ayuda: 'Pedir cajas para cirugías', roles: ['Enfermera', 'IT'] },
       { ruta: '/entrega', nombre: 'Entrega a pabellón', icono: 'fa-truck-medical', ayuda: 'Pedidos por entregar, urgencias primero', roles: ['TENS', 'IT'] },
       { ruta: '/vinculo', nombre: 'Vínculo con paciente', icono: 'fa-hand-holding-medical', ayuda: 'Qué caja se usó con qué paciente', roles: ['Enfermera', 'IT'] },
     ],
   },
   {
-    titulo: 'Bodega',
+    titulo: 'Cajas y existencias',
     items: [
       { ruta: '/inventario', nombre: 'Inventario', icono: 'fa-boxes-stacked', ayuda: 'Stock por tipo de caja' },
       { ruta: '/etiquetas', nombre: 'Etiquetas', icono: 'fa-tags', ayuda: 'Imprimir códigos de barras de cajas y estantes' },
@@ -23,7 +33,7 @@ export const SECCIONES = [
     ],
   },
   {
-    titulo: 'Gestión',
+    titulo: 'Consultar y administrar',
     items: [
       { ruta: '/indicadores', nombre: 'Indicadores', icono: 'fa-gauge-high', ayuda: 'Metas del proyecto' },
       { ruta: '/reportes', nombre: 'Reportes', icono: 'fa-file-lines', ayuda: 'Exportar a Excel o CSV', roles: ['Enfermera', 'IT'] },

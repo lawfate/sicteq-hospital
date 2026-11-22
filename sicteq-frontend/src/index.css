@@ -13,12 +13,12 @@
 @layer base {
   :root {
     color-scheme: dark;
-    --background: 210 30% 7%;
-    --card: 210 26% 11%;
-    --muted: 210 22% 16%;
-    --border: 210 18% 23%;
+    --background: 215 30% 9%;
+    --card: 212 28% 14%;
+    --muted: 212 24% 20%;
+    --border: 210 20% 29%;
     --foreground: 200 20% 93%;
-    --muted-foreground: 205 14% 64%;
+    --muted-foreground: 205 16% 72%;
     --primary: 188 78% 46%;
     --primary-foreground: 210 30% 7%;
     --ok: 150 58% 46%;
@@ -48,6 +48,11 @@
     font-size: 16px;
   }
   :focus-visible { @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background; }
+  button, a, input, select, textarea, summary { touch-action: manipulation; }
+  @media (pointer: coarse) {
+    button, select, summary { min-height: 48px; }
+    input { min-height: 48px; font-size: 16px; }
+  }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }

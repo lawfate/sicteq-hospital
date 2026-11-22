@@ -129,7 +129,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex h-full overflow-hidden bg-background text-foreground">
+      <div inert={guia ? true : undefined} className="flex h-full overflow-hidden bg-background text-foreground">
         <Sidebar onLogout={handleLogout} user={user} isOpen={menuAbierto} setIsOpen={setMenuAbierto} />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -140,14 +140,13 @@ function App() {
             </div>
           )}
           <Header onMenuClick={() => setMenuAbierto(true)} onAyuda={() => setGuia(true)} />
-          {guia && <Guia rol={user.role} onCerrar={cerrarGuia} />}
-          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <main id="contenido" tabIndex={-1} className="flex-1 overflow-y-auto p-4 md:p-6 xl:p-8">
               <Routes>
-                <Route path="/" element={<Dashboard user={user} />} />
+                <Route path="/" element={<Dashboard user={user} onTour={() => setGuia(true)} />} />
                 
                 <Route path="/solicitudes" element={soloSiPuede('/solicitudes', <Solicitudes user={user} />)} />
                 
-                <Route path="/ciclo" element={<Ciclo />} />
+                <Route path="/ciclo" element={<Ciclo user={user} />} />
                 <Route path="/entrega" element={soloSiPuede('/entrega', <Entrega />)} />
                 <Route path="/vinculo" element={soloSiPuede('/vinculo', <Vinculo user={user} />)} />
                 <Route path="/inventario" element={<Inventario />} />
@@ -163,6 +162,7 @@ function App() {
           </main>
         </div>
       </div>
+      {guia && <Guia rol={user.role} onCerrar={cerrarGuia} />}
     </BrowserRouter>
   )
 }

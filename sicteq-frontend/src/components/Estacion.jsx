@@ -140,7 +140,7 @@ export default function Estacion() {
             <form onSubmit={confirmarConteo} className="space-y-3 rounded-md border border-primary/40 bg-primary/10 p-4">
               <p className="font-bold"><span className="font-mono">{conteo.caja}</span> · {conteo.tipo}</p>
               <Label htmlFor="piezas-contadas">Piezas contadas (trae {conteo.piezas}). Si está completa, presione Enter.</Label>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Input
                   id="piezas-contadas"
                   autoFocus
@@ -150,7 +150,7 @@ export default function Estacion() {
                   onChange={(e) => setConteo({ ...conteo, contadas: e.target.value.replace(/\D/g, '') })}
                   className="h-14 w-32 font-mono text-2xl"
                 />
-                <Button type="submit" size="lg" className="flex-1" disabled={ocupado || Number(conteo.contadas) > conteo.piezas || conteo.contadas === ''}>
+                <Button type="submit" size="lg" className="h-auto min-h-14 flex-1 whitespace-normal" disabled={ocupado || Number(conteo.contadas) > conteo.piezas || conteo.contadas === ''}>
                   {Number(conteo.contadas) < conteo.piezas ? `Recibir con ${conteo.piezas - Number(conteo.contadas)} faltante(s)` : 'Recibir completa'}
                 </Button>
                 <Button variant="ghost" onClick={() => { setConteo(null); enfocar(); }}>Cancelar</Button>
@@ -163,7 +163,7 @@ export default function Estacion() {
                   ? 'Escanee las cajas que guarda y después el estante (EST-…) donde quedaron'
                   : `Escanee las cajas una tras otra: cada una pasa a ${estacion.nombre}`}
               </Label>
-              <Input
+              <div className="flex flex-col gap-3 sm:flex-row"><Input
                 id="escaneo-estacion"
                 ref={campo}
                 autoFocus
@@ -172,6 +172,7 @@ export default function Estacion() {
                 placeholder={estacion.estantes ? 'CAJA-0045 o EST-B2' : 'CAJA-0045'}
                 className="h-14 font-mono text-xl uppercase tracking-widest"
               />
+              <Button type="submit" size="lg" disabled={!codigo.trim()}>{ocupado ? 'Espere el resultado…' : 'Registrar caja'}</Button></div>
             </form>
           )}
 
